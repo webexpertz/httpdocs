@@ -1,0 +1,290 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="description" content="Royal Meteorological Society weather data" />
+<meta name="keywords" content="Cumulus, Royal Meteorological Society weather data, weather, data, weather station" />
+<title>Royal Meteorological Society weather</title>
+<link href="weatherstyle.css" rel="stylesheet" type="text/css" />
+</head>
+<body>
+<div id="content">
+<h1>Royal Meteorological Society weather</h1>
+<h2 style="text-align: left; text-transform: none;">&nbsp;Latitude&nbsp;N&nbsp;45&deg;&nbsp;27&#39;&nbsp;00&quot;&nbsp;&nbsp;&nbsp;&nbsp;Longitude&nbsp;E&nbsp;00&deg;&nbsp;59&#39;&nbsp;00&quot;&nbsp;&nbsp;&nbsp;&nbsp;Elevation&nbsp;45&nbsp;m</h2>
+
+<p>Records began on 16 May 2014. Here are the month-by-month extremes recorded since then.</p>
+<input type="button" value="Jan" onclick="changeData(0)"/>
+<input type="button" value="Feb" onclick="changeData(1)"/>
+<input type="button" value="Mar" onclick="changeData(2)"/>
+<input type="button" value="Apr" onclick="changeData(3)"/>
+<input type="button" value="May" onclick="changeData(4)"/>
+<input type="button" value="Jun" onclick="changeData(5)"/>
+<input type="button" value="Jul" onclick="changeData(6)"/>
+<input type="button" value="Aug" onclick="changeData(7)"/>
+<input type="button" value="Sep" onclick="changeData(8)"/>
+<input type="button" value="Oct" onclick="changeData(9)"/>
+<input type="button" value="Nov" onclick="changeData(10)"/>
+<input type="button" value="Dec" onclick="changeData(11)"/>
+<table style="width:100%;border-collapse: collapse; border-spacing: 0;" >
+   <caption>Records for the month of <span id="MonthName">January</span></caption>
+  <tr>
+    <td colspan="3" class="tableseparator_temp">Temperature and Humidity </td>
+  </tr>
+  <tr class="td_temperature_data">
+    <td class="main_table_text_labels">Highest&nbsp;Temperature</td>
+    <td class="right_align_indented"><span id="TempH">15.7</span>&nbsp;&deg;C</td>
+    <td class="right_align_indented"><span id="TempHT">at 17:54 on 09 January 2015</span></td>
+  </tr>
+  <tr class="td_temperature_data">
+    <td class="main_table_text_labels">Lowest&nbsp;Temperature </td>
+    <td class="right_align_indented"><span id="TempL">-4.0</span>&nbsp;&deg;C</td>
+    <td class="right_align_indented"><span id="TempLT">at 07:38 on 23 January 2015</span></td>
+  </tr>
+  <tr class="td_temperature_data">
+    <td class="main_table_text_labels">Highest&nbsp;Dew&nbsp;Point</td>
+    <td class="right_align_indented"><span id="DewPointH">15.6</span>&nbsp;&deg;C</td>
+    <td class="right_align_indented"><span id="DewPointHT">at 18:00 on 09 January 2015</span></td>
+  </tr>
+  <tr class="td_temperature_data">
+    <td class="main_table_text_labels">Lowest&nbsp;Dew&nbsp;Point </td>
+    <td class="right_align_indented"><span id="DewPointL">-4.1</span>&nbsp;&deg;C</td>
+    <td class="right_align_indented"><span id="DewPointLT">at 07:38 on 23 January 2015</span></td>
+  </tr>
+  <tr class="td_temperature_data">
+    <td class="main_table_text_labels">Highest&nbsp;Apparent&nbsp;Temperature</td>
+    <td class="right_align_indented"><span id="AppTempH">17.5</span>&nbsp;&deg;C</td>
+    <td class="right_align_indented"><span id="AppTempHT">at 18:00 on 09 January 2015</span></td>
+  </tr>
+  <tr class="td_temperature_data">
+    <td class="main_table_text_labels">Lowest&nbsp;Apparent&nbsp;Temperature </td>
+    <td class="right_align_indented"><span id="AppTempL">-6.5</span>&nbsp;&deg;C</td>
+    <td class="right_align_indented"><span id="AppTempLT">at 07:38 on 23 January 2015</span></td>
+  </tr>
+  <tr class="td_temperature_data">
+    <td class="main_table_text_labels">Lowest&nbsp;Wind&nbsp;Chill&nbsp;Temperature</td>
+    <td class="right_align_indented"><span id="WChillL">-4.0</span>&nbsp;&deg;C</td>
+    <td class="right_align_indented"><span id="WChillLT">at 07:38 on 23 January 2015</span></td>
+  </tr>
+  <tr class="td_temperature_data">
+    <td class="main_table_text_labels">Highest&nbsp;Heat&nbsp;Index</td>
+    <td class="right_align_indented"><span id="HeatIndexH">15.7</span>&nbsp;&deg;C</td>
+    <td class="right_align_indented"><span id="HeatIndexHT">at 17:54 on 09 January 2015</span></td>
+  </tr>
+  <tr class="td_temperature_data">
+    <td class="main_table_text_labels">Highest Minimum </td>
+    <td class="right_align_indented"><span id="MinTempH">8.7</span>&nbsp;&deg;C</td>
+    <td class="right_align_indented"><span id="MinTempHT">at 00:00 on 09 January 2015</span></td>
+  </tr>
+  <tr class="td_temperature_data">
+    <td class="main_table_text_labels">Lowest Maximum </td>
+    <td class="right_align_indented"><span id="MaxTempL">3.8</span>&nbsp;&deg;C</td>
+    <td class="right_align_indented"><span id="MaxTempLT">at 14:44 on 19 January 2015</span></td>
+  </tr>
+  <tr class="td_temperature_data">
+    <td class="main_table_text_labels">Highest&nbsp;Humidity</td>
+    <td class="right_align_indented"><span id="HumH">99</span>&nbsp;%</td>
+    <td class="right_align_indented"><span id="HumHT">at 00:35 on 01 January 2015</span></td>
+  </tr>
+  <tr class="td_temperature_data">
+    <td class="main_table_text_labels">Lowest&nbsp;Humidity </td>
+    <td class="right_align_indented"><span id="HumL">59</span>&nbsp;%</td>
+    <td class="right_align_indented"><span id="HumLT">at 15:34 on 28 January 2015</span></td>
+  </tr>
+  <tr class="td_temperature_data">
+    <td class="main_table_text_labels">Highest&nbsp;Daily&nbsp;Range</td>
+    <td class="right_align_indented"><span id="HighDailyTempRange">12.0</span>&nbsp;&deg;C</td>
+    <td class="right_align_indented"><span id="HighDailyTempRangeT">on 23 January 2015</span></td>
+  </tr>
+  <tr class="td_temperature_data">
+    <td class="main_table_text_labels">Lowest&nbsp;Daily&nbsp;Range</td>
+    <td class="right_align_indented"><span id="LowDailyTempRange">1.8</span>&nbsp;&deg;C</td>
+    <td class="right_align_indented"><span id="LowDailyTempRangeT">on 21 January 2015</span></td>
+  </tr>
+  <tr>
+    <td colspan="3" class="tableseparator_rainfall">Rainfall</td>
+  </tr>
+  <tr class="td_rainfall_data">
+    <td class="main_table_text_labels">Highest&nbsp;Rain&nbsp;Rate</td>
+    <td class="right_align_indented"><span id="RainRateH">543.6</span>&nbsp;mm/hr</td>
+    <td class="right_align_indented"><span id="RainRateHT">at 22:51 on 22 January 2015</span></td>
+  </tr>
+  <tr class="td_rainfall_data">
+    <td class="main_table_text_labels">Highest&nbsp;Hourly&nbsp;Rainfall</td>
+    <td class="right_align_indented"><span id="HourlyRainH">45.3</span>&nbsp;mm</td>
+    <td class="right_align_indented"><span id="HourlyRainHT">at 22:51 on 22 January 2015</span></td>
+  </tr>
+  <tr class="td_rainfall_data">
+    <td class="main_table_text_labels">Highest&nbsp;Daily&nbsp;Rainfall</td>
+    <td class="right_align_indented"><span id="DailyRainH">13.5</span>&nbsp;mm</td>
+    <td class="right_align_indented"><span id="DailyRainHT">on 08 January 2015</span></td>
+  </tr>
+  <tr class="td_rainfall_data">
+    <td class="main_table_text_labels">Highest&nbsp;Monthly&nbsp;Rainfall</td>
+    <td class="right_align_indented"><span id="MonthlyRainH">46.8</span>&nbsp;mm</td>
+    <td class="right_align_indented"><span id="MonthlyRainHT">January 2015</span></td>
+  </tr>
+  <tr class="td_rainfall_data">
+    <td class="main_table_text_labels">Longest&nbsp;Dry&nbsp;Period</td>
+    <td class="right_align_indented"><span id="LongestDryPeriod">4</span>&nbsp;days</td>
+    <td class="right_align_indented"><span id="LongestDryPeriodT">to 22 January 2015</span></td>
+  </tr>
+  <tr class="td_rainfall_data">
+    <td class="main_table_text_labels">Longest&nbsp;Wet&nbsp;Period</td>
+    <td class="right_align_indented"><span id="LongestWetPeriod">5</span>&nbsp;days</td>
+    <td class="right_align_indented"><span id="LongestWetPeriodT">to 10 January 2015</span></td>
+  </tr>
+  <tr>
+    <td colspan="3" class="tableseparator_wind">Wind</td>
+  </tr>
+  <tr class="td_wind_data">
+    <td class="main_table_text_labels">Highest&nbsp;Wind&nbsp;Gust</td>
+    <td class="right_align_indented"><span id="GustH">48.5</span>&nbsp;m/s</td>
+    <td class="right_align_indented"><span id="GustHT">at 17:25 on 26 January 2015</span></td>
+  </tr>
+  <tr class="td_wind_data">
+    <td class="main_table_text_labels">Highest&nbsp;Wind&nbsp;Speed&nbsp;Average</td>
+    <td class="right_align_indented"><span id="WindH">385.0</span>&nbsp;m/s</td>
+    <td class="right_align_indented"><span id="WindHT">at 17:25 on 26 January 2015</span></td>
+  </tr>
+  <tr class="td_wind_data">
+    <td class="main_table_text_labels">Highest&nbsp;Daily Wind Run</td>
+    <td class="right_align_indented"><span id="WindRunH">23.1</span>&nbsp;km</td>
+    <td class="right_align_indented"><span id="WindRunHT">on 26 January 2015</span></td>
+  </tr>
+
+  <tr>
+    <td colspan="3" class="tableseparator_pressure">Pressure</td>
+  </tr>
+  <tr class="td_pressure_data">
+    <td class="main_table_text_labels">Lowest&nbsp;Pressure&nbsp;(sl) </td>
+    <td class="right_align_indented"><span id="PressL">972.8</span>&nbsp;hPa</td>
+    <td class="right_align_indented"><span id="PressLT">at 04:25 on 30 January 2015</span></td>
+  </tr>
+  <tr class="td_pressure_data">
+    <td class="main_table_text_labels">Highest&nbsp;Pressure&nbsp;(sl)</td>
+    <td class="right_align_indented"><span id="PressH">1036.1</span>&nbsp;hPa</td>
+    <td class="right_align_indented"><span id="PressHT">at 11:02 on 04 January 2015</span></td>
+  </tr>
+  <tr>
+    <td colspan="3" class="td_navigation_bar">:<a href="index.htm">now</a>::<a href="gauges.htm">gauges</a>::<a href="today.htm">today</a>::<a href="yesterday.htm">yesterday</a>::<a href="thismonth.htm">this&nbsp;month</a>::<a href="thisyear.htm">this&nbsp;year</a>::<a href="record.htm">records</a>::<a href="monthlyrecord.htm">monthly&nbsp;records</a>::<a href="trends.htm">trends</a>::<a href="http://sandaysoft.com/forum/">forum</a>:</td>
+  </tr>
+</table>
+<p class="credits"><br />
+Page updated 04/02/2015 16:18:49<br />
+powered by
+<a href="http://sandaysoft.com/products/cumulus" target="_blank">Cumulus</a> v1.9.4 (1095)
+</p>
+</div>
+<script type="text/javascript">
+var monthnames = new Array("January","February","March","April","May","June","July","August","September","October","November","December");
+var hightemp = new Array("15.7","5.1","---","---","20.9","28.6","30.9","25.9","25.5","21.9","17.3","13.6");
+var hightempT = new Array("at 17:54 on 09 January 2015","at 12:25 on 01 February 2015","----","----","at 17:34 on 29 May 2014","at 17:34 on 23 June 2014","at 17:43 on 17 July 2014","at 15:20 on 07 August 2014","at 16:49 on 18 September 2014","at 14:06 on 31 October 2014","at 13:29 on 01 November 2014","at 14:18 on 18 December 2014");
+var lowtemp = new Array("-4.0","-1.3","---","---","0.0","-22.2","11.8","7.2","7.0","4.0","-0.8","-3.7");
+var lowtempT = new Array("at 07:38 on 23 January 2015","at 04:01 on 02 February 2015","----","----","at 11:21 on 27 May 2014","at 13:06 on 06 June 2014","at 05:05 on 02 July 2014","at 05:53 on 24 August 2014","at 07:30 on 23 September 2014","at 06:32 on 05 October 2014","at 02:20 on 25 November 2014","at 06:34 on 31 December 2014");
+var highDP = new Array("15.6","2.9","---","---","12.3","15.8","20.1","20.9","21.0","19.0","17.0","13.5");
+var highDPT = new Array("at 18:00 on 09 January 2015","at 14:53 on 03 February 2015","----","----","at 08:32 on 29 May 2014","at 06:58 on 14 June 2014","at 13:11 on 27 July 2014","at 13:01 on 10 August 2014","at 14:49 on 19 September 2014","at 14:33 on 18 October 2014","at 03:12 on 01 November 2014","at 14:26 on 18 December 2014");
+var lowDP = new Array("-4.1","-4.1","---","---","-6.0","-45.4","3.9","6.5","6.8","3.5","-0.9","-3.8");
+var lowDPT = new Array("at 07:38 on 23 January 2015","at 04:01 on 02 February 2015","----","----","at 11:21 on 27 May 2014","at 13:06 on 06 June 2014","at 14:20 on 01 July 2014","at 05:53 on 24 August 2014","at 03:52 on 25 September 2014","at 00:49 on 22 October 2014","at 02:20 on 25 November 2014","at 06:34 on 31 December 2014");
+var highapptemp = new Array("17.5","3.2","---","---","21.0","28.7","32.3","28.1","29.1","24.2","19.5","14.7");
+var highapptempT = new Array("at 18:00 on 09 January 2015","at 12:25 on 01 February 2015","----","----","at 17:34 on 29 May 2014","at 17:34 on 23 June 2014","at 16:31 on 27 July 2014","at 15:13 on 06 August 2014","at 16:49 on 18 September 2014","at 14:06 on 31 October 2014","at 03:12 on 01 November 2014","at 14:26 on 18 December 2014");
+var lowapptemp = new Array("-6.5","-3.8","---","---","-2.7","-71.9","11.1","6.4","-0.9","2.7","-2.9","-6.2");
+var lowapptempT = new Array("at 07:38 on 23 January 2015","at 04:01 on 02 February 2015","----","----","at 11:21 on 27 May 2014","at 13:06 on 06 June 2014","at 05:05 on 02 July 2014","at 05:53 on 24 August 2014","at 08:24 on 22 September 2014","at 06:32 on 05 October 2014","at 02:20 on 25 November 2014","at 06:34 on 31 December 2014");
+var lowchill = new Array("-4.0","-1.3","---","---","0.0","-49.0","11.8","7.2","4.0","4.0","-0.8","-3.7");
+var lowchillT = new Array("at 07:38 on 23 January 2015","at 04:02 on 02 February 2015","----","----","at 11:21 on 27 May 2014","at 13:06 on 06 June 2014","at 05:05 on 02 July 2014","at 05:53 on 24 August 2014","at 08:24 on 22 September 2014","at 06:32 on 05 October 2014","at 02:20 on 25 November 2014","at 06:34 on 31 December 2014");
+var highheatindex = new Array("15.7","5.1","---","---","20.9","27.7","30.4","25.9","25.5","21.9","17.3","13.6");
+var highheatindexT = new Array("at 17:54 on 09 January 2015","at 12:25 on 01 February 2015","----","----","at 17:34 on 29 May 2014","at 17:34 on 23 June 2014","at 16:31 on 27 July 2014","at 15:20 on 07 August 2014","at 16:49 on 18 September 2014","at 14:06 on 31 October 2014","at 13:29 on 01 November 2014","at 14:18 on 18 December 2014");
+var highmintemp = new Array("8.7","0.1","---","---","13.6","16.6","24.4","17.1","17.0","16.2","13.2","12.2");
+var highmintempT = new Array("at 00:00 on 09 January 2015","at 23:57 on 01 February 2015","----","----","at 02:54 on 29 May 2014","at 06:27 on 23 June 2014","at 09:38 on 28 July 2014","at 02:10 on 06 August 2014","at 06:59 on 05 September 2014","at 00:07 on 18 October 2014","at 19:04 on 01 November 2014","at 21:37 on 18 December 2014");
+var lowmaxtemp = new Array("3.8","2.6","---","---","12.9","14.9","21.3","17.1","18.5","12.6","8.2","4.9");
+var lowmaxtempT = new Array("at 14:44 on 19 January 2015","at 14:14 on 02 February 2015","----","----","at 12:38 on 26 May 2014","at 13:17 on 04 June 2014","at 13:48 on 05 July 2014","at 16:29 on 25 August 2014","at 14:45 on 24 September 2014","at 16:45 on 14 October 2014","at 16:10 on 25 November 2014","at 13:42 on 29 December 2014");
+var highhum = new Array("99","99","---","---","89","89","95","99","99","99","99","99");
+var highhumT = new Array("at 00:35 on 01 January 2015","at 01:20 on 01 February 2015","----","----","at 18:41 on 28 May 2014","at 05:42 on 14 June 2014","at 06:36 on 31 July 2014","at 05:19 on 02 August 2014","at 04:04 on 01 September 2014","at 00:00 on 01 October 2014","at 00:00 on 01 November 2014","at 00:08 on 01 December 2014");
+var lowhum = new Array("59","71","---","---","30","10","24","46","55","60","69","66");
+var lowhumT = new Array("at 15:34 on 28 January 2015","at 12:45 on 01 February 2015","----","----","at 17:23 on 25 May 2014","at 13:06 on 06 June 2014","at 17:40 on 03 July 2014","at 16:22 on 03 August 2014","at 15:54 on 09 September 2014","at 13:57 on 21 October 2014","at 13:35 on 01 November 2014","at 15:17 on 07 December 2014");
+var hightemprange = new Array("12.0","5.0","---","---","15.3","47.5","15.2","12.6","12.7","12.0","11.7","11.4");
+var hightemprangeT = new Array("on 23 January 2015","on 01 February 2015","----","----","on 27 May 2014","on 06 June 2014","on 03 July 2014","on 24 August 2014","on 25 September 2014","on 05 October 2014","on 06 November 2014","on 31 December 2014");
+var lowtemprange = new Array("1.8","3.9","---","---","3.4","4.5","2.5","3.8","3.6","1.1","1.5","1.4");
+var lowtemprangeT = new Array("on 21 January 2015","on 02 February 2015","----","----","on 30 May 2014","on 15 June 2014","on 28 July 2014","on 26 August 2014","on 05 September 2014","on 14 October 2014","on 26 November 2014","on 18 December 2014");
+var rainrate = new Array("543.6","3.6","---","---","---","7.2","500.4","---","---","---","10.8","14.4");
+var rainrateT = new Array("at 22:51 on 22 January 2015","at 11:01 on 03 February 2015","----","----","----","at 14:40 on 23 June 2014","at 01:41 on 18 July 2014","----","----","----","at 15:31 on 11 November 2014","at 20:56 on 26 December 2014");
+var hourlyrain = new Array("45.3","1.5","---","---","---","307.2","280.5","---","---","---","1.5","2.7");
+var hourlyrainT = new Array("at 22:51 on 22 January 2015","at 11:43 on 03 February 2015","----","----","----","at 13:08 on 06 June 2014","at 03:05 on 27 July 2014","----","----","----","at 15:29 on 11 November 2014","at 21:46 on 26 December 2014");
+var dailyrain = new Array("13.5","2.1","---","---","---","2.7","50.7","---","---","---","2.4","10.2");
+var dailyrainT = new Array("on 08 January 2015","on 03 February 2015","----","----","----","on 28 June 2014","on 18 July 2014","----","----","----","on 11 November 2014","on 26 December 2014");
+var monthlyrain = new Array("46.8","2.4","---","---","---","4.5","58.5","---","---","---","2.7","12.6");
+var monthlyrainT = new Array("January 2015","February 2015","----","----","----","June 2014","July 2014","----","----","----","November 2014","December 2014");
+var dryperiod = new Array("4","2","---","---","10","32","5","33","63","94","104","26");
+var dryperiodT = new Array("to 22 January 2015","to 02 February 2015","----","----","to 31 May 2014","to 22 June 2014","to 04 July 2014","to 31 August 2014","to 30 September 2014","to 31 October 2014","to 10 November 2014","to 08 December 2014");
+var wetperiod = new Array("5","1","---","---","---","2","2","---","---","---","2","2");
+var wetperiodT = new Array("to 10 January 2015","to 03 February 2015","----","----","----","to 29 June 2014","to 19 July 2014","----","----","----","to 12 November 2014","to 22 December 2014");
+var highgust = new Array("48.5","---","---","---","---","13.6","0.3","0.3","0.3","0.3","48.0","---");
+var highgustT = new Array("at 17:25 on 26 January 2015","----","----","----","----","at 13:06 on 06 June 2014","at 15:10 on 29 July 2014","at 13:42 on 02 August 2014","at 11:54 on 01 September 2014","at 15:13 on 01 October 2014","at 05:35 on 27 November 2014","----");
+var highwind = new Array("385.0","---","---","---","---","65.3","---","---","13.6","---","386.0","---");
+var highwindT = new Array("at 17:25 on 26 January 2015","----","----","----","----","at 13:06 on 06 June 2014","----","----","at 08:24 on 22 September 2014","----","at 05:35 on 27 November 2014","----");
+var highwindrun = new Array("23.1","---","---","---","---","27.4","---","---","0.8","---","---","---");
+var highwindrunT = new Array("on 26 January 2015","----","----","----","----","on 06 June 2014","----","----","on 22 September 2014","----","----","----");
+var highpress = new Array("1036.1","1020.1","---","---","1020.3","1028.1","1022.1","1021.0","1026.2","1028.0","1026.5","1041.0");
+var highpressT = new Array("at 11:02 on 04 January 2015","at 15:50 on 04 February 2015","----","----","at 07:58 on 31 May 2014","at 09:20 on 12 June 2014","at 07:44 on 02 July 2014","at 09:01 on 16 August 2014","at 02:00 on 22 September 2014","at 09:00 on 02 October 2014","at 11:50 on 24 November 2014","at 21:24 on 29 December 2014");
+var lowpress = new Array("972.8","992.9","---","---","994.4","996.9","997.1","990.1","1006.3","990.8","986.3","989.2");
+var lowpressT = new Array("at 04:25 on 30 January 2015","at 00:00 on 01 February 2015","----","----","at 14:15 on 22 May 2014","at 09:44 on 04 June 2014","at 05:50 on 05 July 2014","at 13:21 on 10 August 2014","at 16:43 on 18 September 2014","at 16:00 on 08 October 2014","at 14:52 on 03 November 2014","at 04:45 on 12 December 2014");
+
+function changeData(month) {
+	document.getElementById('MonthName').innerHTML = monthnames[month];
+	document.getElementById('TempH').innerHTML = hightemp[month];
+	document.getElementById('TempHT').innerHTML = hightempT[month];
+	document.getElementById('TempL').innerHTML = lowtemp[month];
+	document.getElementById('TempLT').innerHTML = lowtempT[month];
+	document.getElementById('DewPointH').innerHTML = highDP[month];
+	document.getElementById('DewPointHT').innerHTML = highDPT[month];
+	document.getElementById('DewPointL').innerHTML = lowDP[month];
+	document.getElementById('DewPointLT').innerHTML = lowDPT[month];
+	document.getElementById('AppTempH').innerHTML = highapptemp[month];
+	document.getElementById('AppTempHT').innerHTML = highapptempT[month];
+	document.getElementById('AppTempL').innerHTML = lowapptemp[month];
+	document.getElementById('AppTempLT').innerHTML = lowapptempT[month];
+	document.getElementById('WChillL').innerHTML = lowchill[month];
+	document.getElementById('WChillLT').innerHTML = lowchillT[month];
+	document.getElementById('HeatIndexH').innerHTML = highheatindex[month];
+	document.getElementById('HeatIndexHT').innerHTML = highheatindexT[month];
+	document.getElementById('MinTempH').innerHTML = highmintemp[month];
+	document.getElementById('MinTempHT').innerHTML = highmintempT[month];
+	document.getElementById('MaxTempL').innerHTML = lowmaxtemp[month];
+	document.getElementById('MaxTempLT').innerHTML = lowmaxtempT[month];
+	document.getElementById('HumH').innerHTML = highhum[month];
+	document.getElementById('HumHT').innerHTML = highhumT[month];
+	document.getElementById('HumL').innerHTML = lowhum[month];
+	document.getElementById('HumLT').innerHTML = lowhumT[month];
+	document.getElementById('HighDailyTempRange').innerHTML = hightemprange[month];
+	document.getElementById('HighDailyTempRangeT').innerHTML = hightemprangeT[month];
+	document.getElementById('LowDailyTempRange').innerHTML = lowtemprange[month];
+	document.getElementById('LowDailyTempRangeT').innerHTML = lowtemprangeT[month];
+	document.getElementById('RainRateH').innerHTML = rainrate[month];
+	document.getElementById('RainRateHT').innerHTML = rainrateT[month];
+	document.getElementById('HourlyRainH').innerHTML = hourlyrain[month];
+	document.getElementById('HourlyRainHT').innerHTML = hourlyrainT[month];
+	document.getElementById('DailyRainH').innerHTML = dailyrain[month];
+	document.getElementById('DailyRainHT').innerHTML = dailyrainT[month];
+	document.getElementById('MonthlyRainH').innerHTML = monthlyrain[month];
+	document.getElementById('MonthlyRainHT').innerHTML = monthlyrainT[month];
+	document.getElementById('LongestDryPeriod').innerHTML = dryperiod[month];
+	document.getElementById('LongestDryPeriodT').innerHTML = dryperiodT[month];
+	document.getElementById('LongestWetPeriod').innerHTML = wetperiod[month];
+	document.getElementById('LongestWetPeriodT').innerHTML = wetperiodT[month];
+	document.getElementById('GustH').innerHTML = highgust[month];
+	document.getElementById('GustHT').innerHTML = highgustT[month];
+	document.getElementById('WindH').innerHTML = highwind[month];
+	document.getElementById('WindHT').innerHTML = highwindT[month];
+	document.getElementById('WindRunH').innerHTML = highwindrun[month];
+	document.getElementById('WindRunHT').innerHTML = highwindrunT[month];
+	document.getElementById('PressL').innerHTML = lowpress[month];
+	document.getElementById('PressLT').innerHTML = lowpressT[month];
+	document.getElementById('PressH').innerHTML = highpress[month];
+	document.getElementById('PressHT').innerHTML = highpressT[month];
+} 
+
+// If you want the page to display the current month when it opens,
+// remove the "//" from the start of the next line
+//changeData(+'02' - 1);
+</script>    
+</body>
+</html>

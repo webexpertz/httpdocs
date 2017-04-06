@@ -1,0 +1,78 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="content-type" content="text/html;charset=utf-8" />
+
+<title>Weather Console</title>
+
+<link href="wconsole.css" media="screen" rel="stylesheet" type="text/css"/>
+<script src="jquery.js" type="text/javascript"></script>
+
+<script src="wconsole.js" type="text/javascript"></script>
+
+
+</head>
+
+<body>
+<div id="console">
+<div id="c_title">
+
+Weather Console
+
+<br/>
+<span id="forecast"></span>
+<p id="wait-msg">Reading data, one moment please</p>
+</div>  <!-- end of c_title -->
+<div id="right-panel">
+<div id="c_wind">
+<p class="box-title">Wind</p>
+<table>
+<tr><td class="box-label">Latest Reading</td><td class="box-field" id="windlatest"></td></tr>
+<tr><td class="box-label">Direction</td><td class="box-field" id="winddir"></td></tr>
+<tr><td class="box-label">10 min. average</td><td class="box-field" id="windavg"></td></tr>
+<tr><td class="box-label">Beaufort Scale</td><td class="box-field" id="beaufort"></td></tr>
+</table>
+</div>  <!-- end of c_wind -->
+<p/>
+<div id="c_press">
+<p class="box-title">Pressure</p>
+<table>
+<tr><td class="box-label">Latest Reading</td><td class="box-field" id="pressure"></td></tr>
+<tr><td class="box-label">Trend in last hour</td><td class="box-field" id="presstrend"></td></tr>
+</table>
+</div>  <!-- end of c_press -->
+</div>  <!-- ennd of right-panel -->
+
+<div id="c_temp">
+<p class="box-title">Temperature</p>
+<table>
+<tr><td class="box-label">Outdoor</td><td class="box-field" id="temp"></td></tr>
+<tr><td class="box-label">Trend in last hour</td><td class="box-field" id="temptrend"></td></tr>
+<tr><td class="box-label">Humidity</td><td class="box-field" id="hum"></td></tr>
+</table>
+</div>  <!-- end of c_temp -->
+<div id="c_rain">
+<p class="box-title">Rainfall</p>
+<table>
+<tr><td class="box-label">Current rate</td><td class="box-field" id="rainrate"></td></tr>
+<tr><td class="box-label">in the last hour</td><td class="box-field" id="rainhour"></td></tr>
+<tr><td class="box-label">Today</td><td class="box-field" id="raintoday"></td></tr>
+</table>
+</div>  <!-- end of c_rain -->
+
+
+
+<div id="c_today">
+<p class="box-title">Todays Records</p>
+<table>
+<tr><td class="tbox-label">Highest Temp</td><td class="tbox-field" id="today-temphigh"></td></tr>
+<tr><td class="tbox-label">Lowest Temp</td><td class="tbox-field" id="today-templow"></td></tr>
+<tr><td class="tbox-label">Highest Wind gust</td><td class="tbox-field" id="today-windgust"></td></tr>
+<tr><td class="tbox-label">Highest Wind 10 min. avg.</td><td class="tbox-field" id="today-windavg"></td></tr>
+</table>
+</div>  <!-- end of c_press -->
+<p id="footer">Last contact with station: <span id="last_contact"></span>.  Update in: <span id="refresh_in">0</span> seconds 
+<a href="wconsole.html" onclick="return popup(this, 'wconsole')"><img id="popout-icon" src="popout.gif" alt="popout"/></a></p>
+</div>  <!-- end of console -->
+</body>
+</html>

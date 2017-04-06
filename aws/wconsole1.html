@@ -1,0 +1,68 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="content-type" content="text/html;charset=utf-8" />
+
+<title>Line Break (Shift + Enter)</title>
+
+<link href="wconsole1.css" media="screen" rel="stylesheet" type="text/css"/>
+<script src="jquery.js" type="text/javascript"></script>
+
+<script src="wconsole.js" type="text/javascript"></script>
+
+
+<!-- Copyright 2000, 2001, 2002, 2003 Macromedia, Inc. All rights reserved. -->
+</head>
+
+<body>
+<div id="console">
+<div id="c_title">
+
+RMetS Weather Station<br />
+  <!-- MENU-LOCATION=NONE -->
+HQ - RG1 7LL
+<p id="wait-msg">Reading data, one moment please</p>
+</div>
+<img src="logo.jpg" width="85" height="22" alt="logo"  />
+<div class="clear"></div>  <!-- end of c_title -->
+<div id="right-panel">
+
+<div id="c_press">
+<p class="box-title">Pressure</p>
+<table>
+<tr><td class="box-label">Latest Reading</td><td class="box-field" id="pressure"></td></tr>
+<tr><td class="box-label">Trend - last hr</td><td class="box-field" id="presstrend"></td></tr>
+</table>
+</div>  <!-- end of c_press -->
+
+<div id="c_temp">
+<p class="box-title">Temperature</p>
+<table>
+<tr><td class="box-label">Outdoor</td><td class="box-field" id="temp"></td></tr>
+<tr><td class="box-label">Trend - last hr</td><td class="box-field" id="temptrend"></td></tr>
+<tr><td class="box-label">Humidity</td><td class="box-field" id="hum"></td></tr>
+</table>
+</div>  <!-- end of c_temp -->
+<div id="c_rain">
+<p class="box-title">Rainfall</p>
+<table>
+<tr><td class="box-label">Current rate</td><td class="box-field" id="rainrate"></td></tr>
+<tr><td class="box-label">last hr</td><td class="box-field" id="rainhour"></td></tr>
+<tr><td class="box-label">Today</td><td class="box-field" id="raintoday"></td></tr>
+</table>
+</div> <!-- end of c_rain -->
+<div id="c_today">
+<p class="box-title">Today's Records</p>
+<table>
+<tr><td class="tbox-label">Highest Temp</td><td class="tbox-field" id="today-temphigh"></td></tr>
+<tr><td class="tbox-label">Lowest Temp</td><td class="tbox-field" id="today-templow"></td></tr>
+
+</table>
+</div>  <!-- end of c_press -->
+</div>  <!-- ennd of right-panel -->
+<div class="clear"></div>
+<p id="footer">Last reading: <span id="last_contact"></span>.  Update in: <span id="refresh_in">0</span> secs 
+</p>
+</div>  <!-- end of console -->
+</body>
+</html>
