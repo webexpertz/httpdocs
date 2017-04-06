@@ -1,0 +1,87 @@
+diff --git a/docroot/.htaccess b/docroot/.htaccess
+index 8a20c8c..c62b839 100644
+--- a/docroot/.htaccess
++++ b/docroot/.htaccess
+@@ -38,8 +38,8 @@ DirectoryIndex index.php index.html index.htm
+   php_value mbstring.http_input             pass
+   php_value mbstring.http_output            pass
+   php_flag mbstring.encoding_translation    off
+-  php_value upload_max_filesize             8M
+-  php_value post_max_size                   12M
++  php_value upload_max_filesize             50M
++  php_value post_max_size                   64M
+   php_value memory_limit                    128M
+   php_value display_errors                  0
+ </IfModule>
+diff --git a/docroot/sites/all/modules/custom/commerce_paypoint_gateway_hosted/commerce_paypoint_gateway_hosted.module b/docroot/sites/all/modules/custom/commerce_paypoint_gateway_hosted/commerce_paypoint_gateway_hosted.module
+index 0206a22..30fcc03 100644
+--- a/docroot/sites/all/modules/custom/commerce_paypoint_gateway_hosted/commerce_paypoint_gateway_hosted.module
++++ b/docroot/sites/all/modules/custom/commerce_paypoint_gateway_hosted/commerce_paypoint_gateway_hosted.module
+@@ -86,6 +86,7 @@ function commerce_paypoint_gateway_hosted_redirect_form($form, &$form_state, $or
+   $base_url = preg_match('/rmets.org/', $base_url) ? 'https://www.rmets.org' : $base_url;
+ 
+   $callback = $base_url . '/checkout/complete/commerce_paypoint_gateway_hosted';
++  watchdog('commerce_paypoint_gateway_hosted', 'Callback URL: !callback', array('!callback' => $callback), WATCHDOG_ERROR);
+ 
+   $order_total = entity_metadata_wrapper('commerce_order', $order)->commerce_order_total->value();
+   $amount = commerce_currency_amount_to_decimal($order_total['amount'], 'GBP');
+@@ -212,6 +213,20 @@ function commerce_paypoint_gateway_hosted_paypoint_callback() {
+     $details->hash = $_GET['hash'];
+   }
+   else {
++    //watchdog('commerce_paypoint_gateway_hosted', 'POST Data: !data', array('!data' => nl2br(htmlentities(print_r($_POST, TRUE)))), WATCHDOG_INFO);
++    watchdog('commerce_paypoint_gateway_hosted', 'POST Data: !post, GET Data: !get', array('!post' => nl2br(htmlentities(print_r($_POST, TRUE))), '!get' => nl2br(htmlentities(print_r($_GET, TRUE)))), WATCHDOG_INFO);
++    // If the POST array doesn't contain the valid param, set the data from the GET.
++    if (!isset($_POST['valid'])) {
++      $_POST['valid'] = $_GET['valid'];
++      $_POST['trans_id'] = $_GET['trans_id'];
++      $_POST['amount'] = $_GET['amount'];
++      $_POST['valid'] = $_GET['valid'];
++      $_POST['code'] = $_GET['code'];
++      $_POST['resp_code'] = $_GET['resp_code'];
++      $_POST['message'] = $_GET['message'];
++      $_POST['hash'] = $_GET['hash'];
++    }
++
+     $valid = check_plain($_POST['valid']);
+     $trans_id = check_plain($_POST['trans_id']);
+ 
+diff --git a/docroot/sites/all/modules/custom/rmets_cpd/rmets_cpd_accreditation/rmets_cpd_accreditation.module b/docroot/sites/all/modules/custom/rmets_cpd/rmets_cpd_accreditation/rmets_cpd_accreditation.module
+index f1f08f5..56fa92c 100644
+--- a/docroot/sites/all/modules/custom/rmets_cpd/rmets_cpd_accreditation/rmets_cpd_accreditation.module
++++ b/docroot/sites/all/modules/custom/rmets_cpd/rmets_cpd_accreditation/rmets_cpd_accreditation.module
+@@ -159,7 +159,7 @@ function rmets_cpd_accreditation_form_cpd_accreditation_application_node_form_al
+ 
+   // Show a warning message for applications which do not have the new application type set.
+   if (empty($form['field_crm_accreditation_type'][LANGUAGE_NONE][0]['value']['#default_value'])) {
+-    drupal_set_message('Due to a change in our membership system, please select the relevant Accreditation Application that you are applying for.', 'warning', FALSE);
++    //drupal_set_message('Due to a change in our membership system, please select the relevant Accreditation Application that you are applying for.', 'warning', FALSE);
+   }
+ 
+   // Hide unneeded fields.
+diff --git a/docroot/sites/all/modules/custom/rmets_crm/rmets_crm.drush.inc b/docroot/sites/all/modules/custom/rmets_crm/rmets_crm.drush.inc
+index c31a9f3..7b6fdcc 100644
+--- a/docroot/sites/all/modules/custom/rmets_crm/rmets_crm.drush.inc
++++ b/docroot/sites/all/modules/custom/rmets_crm/rmets_crm.drush.inc
+@@ -796,7 +796,7 @@ function drush_rmets_crm_get_all_events() {
+   $guid = drush_get_option('guid', variable_get('rmets_crm_api_guid', ''));
+   $fromDate = drush_get_option('fromDate', '');
+   $page = drush_get_option('page', 1);
+-  $recordcount = drush_get_option('recordcount', 100);
++  $recordcount = drush_get_option('recordcount', 600);
+   drush_print("process command: $cmd for page: $page, recordcount: $recordcount, fromDate: $fromDate");
+ 
+   try {
+diff --git a/docroot/sites/all/modules/custom/rmets_events/rmets_events.module b/docroot/sites/all/modules/custom/rmets_events/rmets_events.module
+index ac34ee1..113f861 100644
+--- a/docroot/sites/all/modules/custom/rmets_events/rmets_events.module
++++ b/docroot/sites/all/modules/custom/rmets_events/rmets_events.module
+@@ -178,7 +178,7 @@ function rmets_events_get_events_from_crm($fromDate = NULL) {
+     $request = new GetAllEventsRequest();
+     $request->setGuid(variable_get('rmets_crm_api_guid', ''));
+     $request->setPage(1);
+-    $request->setRecordCount(100);
++    $request->setRecordCount(600);
+ 
+     if (!empty($fromDate)) {
+       $request->setFromDate($fromDate);

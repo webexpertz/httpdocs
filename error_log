@@ -1,0 +1,2 @@
+[16-Nov-2016 10:34:26 Europe/London] PHP Fatal error:  Using $this when not in object context in /usr/local/share/drush-7.3.0/commands/core/core.drush.inc(1122) : eval()'d code on line 1
+[16-Nov-2016 10:36:18 Europe/London] PHP Fatal error:  Using $this when not in object context in /usr/local/share/drush-7.3.0/commands/core/core.drush.inc(1122) : eval()'d code on line 1
