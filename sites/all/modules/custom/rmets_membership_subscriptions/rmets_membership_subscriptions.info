@@ -1,0 +1,13 @@
+name = rmets_membership_subscriptions
+description = In which we show current subscriptions and subscriptions that need paying for
+core = 7.x
+package = RMetS
+version = 7.x-1.2
+dependencies[] = commerce_checkout
+dependencies[] = commerce_order
+dependencies[] = entity
+dependencies[] = rules
+features[features_api][] = api:2
+features[rules_config][] = rules_processed_membership_subscription_order
+features[rules_config][] = rules_send_a_standard_order_notification_email_no_subscriptions_
+features[rules_config][] = rules_send_a_subscription_order_notification_email

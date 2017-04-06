@@ -1,0 +1,9 @@
+name = "RMets CPD Records"
+description = The RMetS CPD Records
+core = 7.x
+package = RMetS
+
+dependencies[] = views
+
+files[] = plugins/views/views_plugin_argument_user_cpd_objectives.inc
+files[] = plugins/views/views_plugin_access_cpd.inc

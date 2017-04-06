@@ -1,0 +1,1360 @@
+/* Sitename CSS - Main definitions */
+
+/* Contents:
+
+  #01# - Basics
+  #01.1# - Headings
+  #01.2# - Lists
+  #02# - Layout
+  #02.1 - Page
+  #02.1.1# - Header
+  #02.1.2# - Content
+  #02.1.3# - Right Sidebar
+  #02.2# - Footer
+  #03# - Tabs
+  #04# - Standard content page layout
+  #05# - Blocks
+  #06# - Forms
+  #07# - Tables
+  #08# - Messages
+*/
+
+
+/* #01# Basics */
+body {
+  font-family: 'Droid Sans', sans-serif;
+  font-weight: 400;
+  letter-spacing: -0.03em;
+  font-size: 14px;
+  line-height: 20px;
+  padding-bottom: 30px;
+  color: #454542;
+  background: url(../images/bck-rpt.gif) repeat 0 0;
+}
+
+body.baseline-grid {
+  background: #fff url(../images/baseline.gif);
+}
+
+body,
+input,
+select,
+textarea,
+button {
+  font-family: 'Droid Sans', sans-serif;
+}
+
+/* Use a class for @font-face */
+.font-face-class-name {
+  /* Styles */
+}
+
+p,
+pre,
+address {
+  position: relative;
+  margin: 0 0 15px;
+  top: 5px;
+}
+
+p.italic {
+  font-family: Georgia, serif;
+  font-style: italic;
+  margin-bottom: 0;
+  top: 3px;
+}
+
+blockquote {
+  margin: 0 0 0 60px;
+  font-size: 15px;
+  font-family: Georgia, serif;
+  font-style: italic;
+}
+
+blockquote:before {
+  content: "“";
+  display: block;
+  float: left;
+  font-size: 120px;
+  font-style: normal;
+  margin: 40px 0 -30px -60px;
+}
+
+blockquote p {
+  top: 4px;
+}
+
+strong {
+  font-weight: bold;
+}
+
+a {
+  text-decoration: none;
+  color: #2a58a5;
+  /*
+  -moz-transition: all 0.2s linear;
+  -o-transition: all 0.2s linear;
+  -webkit-transition: all 0.2s linear;
+  transition: all 0.2s linear;*/
+}
+
+a:hover {
+	color: #2a58a5;
+  text-decoration: underline;
+}
+
+.small { /* For things like help text etc */
+  font-size: 12px;
+  margin-bottom: 5px;
+}
+
+.italic {
+  font-style: italic;
+}
+
+/* #01.1# - Headings */
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  position: relative;
+  font-weight: 700;
+}
+
+
+h2,
+h3,
+h4 {
+  margin-top: 20px;
+}
+
+h4,
+h5,
+h6 {
+  margin-bottom: 0;
+}
+
+h1,
+h2:first-child,
+h3:first-child,
+h4:first-child {
+  margin-top: 0;
+}
+
+h1,
+h2 {
+  line-height: 40px;
+  margin-bottom: 10px;
+}
+
+h1 {
+  font-size: 26px;
+  top: 8px;
+}
+
+h2 {
+  font-size: 22px;
+  top: 10px
+}
+
+h3 {
+  font-size: 16px;
+  top: 2px;
+  margin-bottom: 10px;
+}
+
+.block h3 {
+  margin-top: 0;
+}
+
+.block-head h3 {
+	text-shadow: 0 1px 0 #FFFFFF;
+	padding: 8px 0 0 12px;
+	margin: 0 30px 0 0;
+}
+
+h4 {
+	font-size: 18px;
+	top: 3px;
+}
+
+h5 {
+  top: 6px;
+}
+
+h6 {
+  margin-top: 1px;
+  top: 4px;
+}
+
+.front h2,
+.front h3 {
+	font-weight: 400;
+}
+
+/* Uncomment this if you want linked headings to not inherit the default a link colour
+h1 a:hover,
+h2 a:hover,
+h3 a:hover,
+h4 a:hover {
+  color: #000;
+  border-bottom: #222 1px dotted;
+  text-decoration: none;
+}
+*/
+
+/* #01.2# - Lists */
+
+ul,
+.item-list ul,
+ol,
+dl,
+dialog {
+  position: relative;
+  top: 5px;
+  margin-top: 20px;
+  margin-bottom: 20px;
+}
+
+.item-list ul li {
+  margin: 0 0 0 20px;
+}
+
+ul {
+  list-style: disc;
+}
+
+ul.inline {
+	margin: 0;
+	padding: 0;
+}
+
+ul.inline li {
+	float: left;
+	list-style: none;
+	margin: 0;
+	padding: 0 10px;
+}
+
+li ul,
+li ol,
+ul ul,
+ol ol {
+  top: 0;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+ul.no-thumbs {
+	clear: left;
+	margin: 0;
+	padding: 0;
+}
+
+ul.no-thumbs li {
+	float: left;
+	width: 100%;
+	list-style: none;
+	margin: 10px 0;
+	padding: 0;
+}
+
+ul.arrows {
+	padding: 0;
+	margin: 0 0 6px 0;
+}
+
+ul.arrows li {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+}
+
+.title {
+	font-size: 16px;
+	font-weight: 700;
+	padding: 0;
+	margin: 0;
+}
+
+.date {
+	font-size: 12px;
+	font-weight: 700;
+	padding: 0;
+	margin: 0;
+}
+
+.teaser {
+	font-weight: 400;
+	padding: 0;
+	margin: 0;
+}
+
+.location {
+	color: #a6a69a;
+	text-transform: uppercase;
+	font-size: 12px;
+}
+
+
+/* #02# - Framework */
+* { /* Box-sizing makes an element include the padding and border in its overall width (i.e. how it should be!) */
+  background-repeat: no-repeat;
+
+  -moz-box-sizing: border-box;
+  -webkit-box-sizing: border-box;
+  box-sizing: border-box;
+}
+
+.col-2 {
+  width: 140px;
+}
+
+.col-4 {
+  width: 300px;
+}
+
+.col-8 {
+  width: 620px;
+}
+
+.inner {
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 940px;
+}
+
+/* #03# - Layout */
+
+iframe {
+  display: block; /* Removes space under iframe */
+}
+
+#wrapper {
+  /* Comment out the following line to kick-in responsiveness */
+  width: 980px;
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.first {
+  margin-left: 0;
+  padding-left: 0;
+}
+
+.last {
+  margin-right: 0;
+  padding-right: 0;
+}
+
+.left {
+  float: left;
+}
+
+.right {
+  float: right;
+}
+
+.no-padding {
+  padding: 0;
+}
+
+.clear {
+  clear: both;
+}
+
+.clean-list {
+  list-style: none;
+  padding: 0;
+}
+
+.ir { /* Class for image replacement */
+  overflow: hidden;
+  text-indent: -500em;
+}
+
+.padded {
+  padding: 15px;
+}
+
+
+/* #02.1.1# - Header */
+#header {
+	max-width: 980px;
+	height: 116px;
+	background: url(../images/head-bck-grad-rpt.png) repeat-x left bottom #1d5099;
+	-webkit-border-bottom-right-radius: 4px;
+	-webkit-border-bottom-left-radius: 4px;
+	-moz-border-radius-bottomright: 4px;
+	-moz-border-radius-bottomleft: 4px;
+	border-bottom-right-radius: 4px;
+	border-bottom-left-radius: 4px;
+}
+
+.header-inner {
+	position: relative;
+	z-index: 1;
+	height: 116px;
+	background: url(../images/head-bck-rpt.png) repeat 0 0;
+}
+
+.cloud {
+	background: url(../images/cloud.png) no-repeat 0 0;
+	width: 234px;
+	height: 112px;
+	position: relative:
+	left: 0;
+	top: 0;
+	z-index: 5;
+}
+
+.logo-wrapper {
+	width: 410px;
+  margin: 0;
+  position: relative;
+	top: -40px;
+	left: 20px;
+	z-index: 10;
+}
+
+.logo {
+  display: block;
+  background: url(../images/logo.png) 0 0 no-repeat transparent;
+  max-width: 410px;
+  height: 31px;
+  overflow: hidden;
+  text-indent: -5000px;
+}
+
+.site-links {
+	position: absolute;
+	right: 8px;
+	top: 14px;
+}
+
+.site-links li {
+	font-size: 12px;
+	line-height: 12px;
+	height: 12px;
+	border-right: 1px solid #7899d0;
+}
+
+.site-links li.no-borders {
+	border-right: none;
+}
+
+.site-links a {
+	color: #fff;
+}
+
+ul.inline li.social-link {
+	padding: 0 3px;
+}
+
+a.welsh {
+	background: url(../images/wales.png) no-repeat left 2px;
+	padding: 0 0 0 20px;
+}
+
+a.social {
+	display: block;
+	width: 16px;
+	height: 16px;
+	background: url(../images/social.png) no-repeat 0 0;
+	overflow: hidden;
+	text-indent: -5000px;
+	margin-top: -2px;
+}
+
+a.tw {
+	background-position: -21px 0;
+}
+
+a.fa {
+	background-position: -42px 0;
+}
+
+a.button-link-small {
+	margin-top: -5px;
+}
+
+.search {
+	text-align: right;
+	position: absolute;
+	top: 72px;
+	right: 17px;
+	width: 190px;
+}
+
+
+/*
+ *
+ * Navigation
+ *
+ */
+
+/* Default nav styles */
+.horizontal-nav {
+  list-style: none;
+  padding: 0;
+}
+
+.horizontal-nav li {
+  float: left;
+}
+
+
+/* Primary nav  */
+.primary-nav {
+  margin: 0;
+  top: 0; /* Resets default style used for alignment to the baseline grid */
+  background: url(../images/nav-bck-rpt.png) repeat-x left bottom #f2f1ea;
+  border: 1px solid #dcdac8;
+  -webkit-border-radius: 4px;
+	-moz-border-radius: 4px;
+	border-radius: 4px;
+	box-shadow: #d1cfbc 0 1px 0;
+	
+}
+
+.primary-nav li {
+  margin: 0 0 0 1px;
+  padding: 0 !important;
+  border-right: 1px solid #ceccb8;
+}
+
+.primary-nav li a {
+  display: block;
+  font-size: 15px;
+  font-weight: 400;
+  color: #4a4a43;
+  text-shadow: #fff 0 1px 0;
+  padding: 8px 0;
+  margin: 0 16px;
+}
+
+.primary-nav li.collapsed a {
+	background: url(../images/nav-arrow.png) no-repeat right 15px;
+	padding: 8px 15px 8px 0;
+}
+
+.primary-nav li.first {
+  margin-left: 0;
+}
+
+.primary-nav li.last {
+  margin-right: 0;
+  border: none;
+}
+
+.primary-nav li.last a {
+  padding: 8px 0; /* More padding for the last item to line it up with the rest of the right site margin */
+	margin-right: 15px;
+}
+
+.primary-nav li a.active,
+.primary-nav li a:hover,
+.primary-nav li a:focus {
+  color: #2a58a5;
+  text-decoration: none;
+}
+
+.primary-nav li.collapsed a.active,
+.primary-nav li.collapsed a:hover,
+.primary-nav li.collapsed a:focus {
+	background: url(../images/nav-arrow.png) no-repeat right -12px;
+}
+
+/* Seconday nav */
+.secondary-nav {
+  margin: 0;
+  top: 0; /* Resets default style used for alignment to the baseline grid */
+}
+
+.secondary-nav li {
+  margin-left: 20px;
+}
+
+.secondary-nav li a {
+  font-size: 12px;
+  color: #fff;
+}
+
+.secondary-nav li a:hover {
+  text-decoration: none;
+  border-bottom: #fff 1px dotted;
+}
+
+
+
+
+
+
+/* #02.1.2# - Middle */
+
+#middle {
+  padding: 20px 20px 2px 20px;
+  width: 100%;
+	background-color: #fff;
+	-webkit-border-radius: 4px;
+	-moz-border-radius: 4px;
+	border-radius: 4px;
+}
+
+#content {
+  position: relative;
+}
+
+body.sidebar-first #content,
+body.sidebar-second #content {
+  width: 65.957447%;
+  max-width: 620px;
+}
+
+body.listing-page #content,
+body.basic-page #content {
+  padding-left: 20px;
+  padding-right: 20px;
+}
+
+/* #02.1.3# - Right Sidebar */
+
+#sidebar-second {
+  width: 31.914894%;
+  max-width: 300px;
+}
+
+/* #02.2# - Footer */
+
+#adverts ul {
+	top: 0;
+}
+
+#adverts ul li {
+	height: 130px;
+	width: 205px;
+	float: left;
+	margin: 0 53px 0 0;
+	padding: 0;
+}
+
+#adverts ul li.last {
+	margin-right: 0;
+}
+
+#footer {
+	margin: 0 auto;
+  max-width: 980px;
+  width: 980px;
+	height: 165px;
+	border: 1px solid #dbd8c7;
+	background: url(../images/ft-grad-bck.png) repeat-x left bottom #eeeee5;
+	-webkit-border-radius: 4px;
+	-moz-border-radius: 4px;
+	border-radius: 4px;
+	font-size: 13px;
+	line-height: 18px;
+}
+
+#footer ul,
+#footer li {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+#footer .col {
+	width: 31%;
+	margin: 15px 0 0 20px;
+}
+
+
+/* #03# - Tabs */
+ul.tabs {
+  margin: 0 0 20px;
+  line-height: 20px;
+  border-bottom: 0;
+  padding: 0;
+  top: 0;
+}
+
+ul.tabs li {
+  display: inline-block;
+}
+
+ul.tabs li a {
+  display: block;
+  
+  background: #f5f3f0;
+  color: #222222;
+  border: 0;
+  border-radius: 3px;
+  
+  /* Make this 1px less if there's a 1px border etc */
+  height: 40px;
+  line-height: 40px;
+  margin: 0;
+}
+
+ul.tabs li a.active {
+  background: #df1f28;
+  color: #ffffff;
+  border: 0;
+}
+
+
+/* #03# - Blocks */
+
+.welcome {
+	width: 48%;
+	padding-right: 20px;
+}
+
+.join-us {
+	width: 48%;
+	padding-left: 20px;
+}
+
+.news h2 {
+	margin: 0;
+	float: left;
+}
+
+.news ul.inline {
+	margin-top: 17px;
+}
+
+.feed-list {
+  width: 100%;
+  margin: 0;
+  top: 0;
+}
+
+.feed-list li {
+  margin-bottom: 20px;
+}
+
+.feed-list h4 {
+  margin-top: 0;
+}
+/*
+.feed-list p:last-child {
+  margin-bottom: 0;
+}
+*/
+.keylined {
+  border: #336c98 3px solid;
+}
+
+.carousel { /* remove this */
+	height: 340px; 
+	width: 100%;
+	background: #eee;
+	text-align: center;
+	padding-top: 160px;
+	color: #ccc;
+}
+
+
+/* #06# - Forms */
+input,
+select,
+textarea,
+button {
+  font-size: 13px;
+  font-weight: 400;
+  margin: 0;
+}
+
+label {
+  display: block;
+  position: relative;
+  top: 5px;
+  margin: 0 0 5px;
+}
+
+.form-text,
+.form-textarea {
+  width: 100%;
+  border: none;
+  padding: 3px 5px;
+  background: #fff; /* Old browsers */
+  outline: none;
+  border-radius: 4px;
+}
+
+.search .form-text {
+	width: 150px;
+}
+
+.form-textarea {
+  padding: 10px 10px 6px;
+}
+
+.form-text:focus,
+.form-textarea:focus {    
+  box-shadow: inset #666 0 0px 3px;
+}
+
+.form-text,
+.form-file {
+  height: 25px;
+}
+
+.form-submit,
+.button-link {
+  display: inline-block;
+  color: #ffffff;
+  font-weight: 700;
+  text-align: center;
+  text-shadow: #ba6901 0 -1px 0;
+  padding: 6px 15px 7px;
+  margin-top: 5px;
+  
+  border: none;
+  border-radius: 4px;  
+
+  background: #ff7d00; /* Old browsers */
+
+  background: -moz-linear-gradient(top, #ff9f00, #ff6900); /* FF3.6+ */
+  background: -webkit-gradient(linear, 0% 0%, 0% 100%, from(#ff9f00), to(#ff6900)); /* Chrome,Safari4+ */
+  background: -webkit-linear-gradient(top, #ff9f00, #ff6900); /* Chrome10+,Safari5.1+ */
+  background: -o-linear-gradient(top, #ff9f00, #ff6900); /* Opera 11.10+ */
+  background: -ms-linear-gradient(top, #ff9f00, #ff6900); /* IE10+ */
+  background: linear-gradient(top, #ff9f00, #ff6900); /* W3C */
+}
+
+.form-submit:hover,
+.button-link:hover,
+.form-submit:focus,
+.button-link:focus {
+  background: #ff7d00; /* Old browsers */
+  
+  background: -moz-linear-gradient(top, #ff9f00, #ff6900); /* FF3.6+ */
+  background: -webkit-gradient(linear, 0% 0%, 0% 100%, from(#ff9f00), to(#ff6900)); /* Chrome,Safari4+ */
+  background: -webkit-linear-gradient(top, #ff9f00, #ff6900); /* Chrome10+,Safari5.1+ */
+  background: -o-linear-gradient(top, #ff9f00, #ff6900); /* Opera 11.10+ */
+  background: -ms-linear-gradient(top, #ff9f00, #ff6900); /* IE10+ */
+  background: linear-gradient(top, #ff9f00, #ff6900); /* W3C */
+
+  text-decoration: none;
+  color: #ffffff;
+  box-shadow: #ababab 0 1px 3px;
+}
+
+.form-submit:active,
+.button-link:active {
+  background: #ff7d00; /* Old browsers */
+  
+  background: -moz-linear-gradient(top, #ff9f00, #ff6900); /* FF3.6+ */
+  background: -webkit-gradient(linear, 0% 0%, 0% 100%, from(#ff9f00), to(#ff6900)); /* Chrome,Safari4+ */
+  background: -webkit-linear-gradient(top, #ff9f00, #ff6900); /* Chrome10+,Safari5.1+ */
+  background: -o-linear-gradient(top, #ff9f00, #ff6900); /* Opera 11.10+ */
+  background: -ms-linear-gradient(top, #ff9f00, #ff6900); /* IE10+ */
+  background: linear-gradient(top, #ff9f00, #ff6900); /* W3C */
+  
+  text-decoration: none;
+  color: #ffffff;
+  box-shadow: #ababab 0 1px 3px;
+  
+}
+
+a.button-link-small {
+	display: inline-block;
+  color: #4a4a43;
+  font-weight: 400;
+  font-size: 12px;
+  text-align: center;
+  text-shadow: #fff 0 1px 0;
+  padding: 3px 8px 4px;
+  
+  border: none;
+  border-radius: 3px;  
+
+  background: #dfdfd4; /* Old browsers */
+
+  background: -moz-linear-gradient(top, #e7e7df, #d2d2c3); /* FF3.6+ */
+  background: -webkit-gradient(linear, 0% 0%, 0% 100%, from(#e7e7df), to(#d2d2c3)); /* Chrome,Safari4+ */
+  background: -webkit-linear-gradient(top, #e7e7df, #d2d2c3); /* Chrome10+,Safari5.1+ */
+  background: -o-linear-gradient(top, #e7e7df, #d2d2c3); /* Opera 11.10+ */
+  background: -ms-linear-gradient(top, #e7e7df, #d2d2c3); /* IE10+ */
+  background: linear-gradient(top, #e7e7df, #d2d2c3); /* W3C */
+}
+
+a.button-link-small:hover,
+a.button-link-small:focus,
+a.button-link-small:active {
+	display: inline-block;
+  color: #4a4a43;
+  font-weight: 400;
+  font-size: 12px;
+  text-align: center;
+  text-shadow: #fff 0 1px 0;
+  padding: 3px 8px 4px;
+  
+  border: none;
+  border-radius: 3px;  
+
+  background: #dfdfd4; /* Old browsers */
+
+  background: -moz-linear-gradient(top, #e7e7df, #d2d2c3); /* FF3.6+ */
+  background: -webkit-gradient(linear, 0% 0%, 0% 100%, from(#e7e7df), to(#d2d2c3)); /* Chrome,Safari4+ */
+  background: -webkit-linear-gradient(top, #e7e7df, #d2d2c3); /* Chrome10+,Safari5.1+ */
+  background: -o-linear-gradient(top, #e7e7df, #d2d2c3); /* Opera 11.10+ */
+  background: -ms-linear-gradient(top, #e7e7df, #d2d2c3); /* IE10+ */
+  background: linear-gradient(top, #e7e7df, #d2d2c3); /* W3C */
+  
+  box-shadow: #031838 0 1px 3px;
+  text-decoration: none;
+}
+
+.search .form-submit {
+	display: inline-block;
+  color: #4a4a43;
+  font-weight: 400;
+  font-size: 13px;
+  text-align: center;
+  text-shadow: #fff 0 1px 0;
+  padding: 4px 8px 4px;
+  margin-top: 0;
+  border: none;
+  border-radius: 3px;  
+
+  background: #dfdfd4; /* Old browsers */
+
+  background: -moz-linear-gradient(top, #e7e7df, #d2d2c3); /* FF3.6+ */
+  background: -webkit-gradient(linear, 0% 0%, 0% 100%, from(#e7e7df), to(#d2d2c3)); /* Chrome,Safari4+ */
+  background: -webkit-linear-gradient(top, #e7e7df, #d2d2c3); /* Chrome10+,Safari5.1+ */
+  background: -o-linear-gradient(top, #e7e7df, #d2d2c3); /* Opera 11.10+ */
+  background: -ms-linear-gradient(top, #e7e7df, #d2d2c3); /* IE10+ */
+  background: linear-gradient(top, #e7e7df, #d2d2c3); /* W3C */
+}
+
+.search .form-submit:hover,
+.search .form-submit:focus,
+.search .form-submit:active {
+	display: inline-block;
+  color: #4a4a43;
+  font-weight: 400;
+  font-size: 13px;
+  text-align: center;
+  text-shadow: #fff 0 1px 0;
+  padding: 4px 8px 4px;
+  margin-top: 0;
+  border: none;
+  border-radius: 3px;  
+
+  background: #dfdfd4; /* Old browsers */
+
+  background: -moz-linear-gradient(top, #e7e7df, #d2d2c3); /* FF3.6+ */
+  background: -webkit-gradient(linear, 0% 0%, 0% 100%, from(#e7e7df), to(#d2d2c3)); /* Chrome,Safari4+ */
+  background: -webkit-linear-gradient(top, #e7e7df, #d2d2c3); /* Chrome10+,Safari5.1+ */
+  background: -o-linear-gradient(top, #e7e7df, #d2d2c3); /* Opera 11.10+ */
+  background: -ms-linear-gradient(top, #e7e7df, #d2d2c3); /* IE10+ */
+  background: linear-gradient(top, #e7e7df, #d2d2c3); /* W3C */
+  
+  box-shadow: #031838 0 1px 3px;
+  text-decoration: none;
+}
+
+.form-managed-file .form-submit {
+  margin-left: 10px;
+}
+
+.form-item {
+  position: relative;
+  margin: 0 0 20px 0;
+  padding: 0;
+}
+
+
+/* Password confirm */
+.form-type-password-confirm label {
+  margin-bottom: 20px;
+}
+
+.form-type-password label {
+  margin-bottom: 5px;
+}
+
+input.password-confirm,
+input.password-field {
+  margin-bottom: 0;
+}
+
+/* Select menus */
+.form-item-select {
+  min-height: 60px;
+  margin-bottom: 0;
+}
+
+.form-select {
+  position: relative;
+  /* padding: 8px 0 7px; This fixes the baseline, but looks shit in FF */
+  top: 5px;
+}
+
+/* Form markup */
+.form-type-item label {
+  margin-bottom: 0;
+}
+
+
+/* Checkboxes and radio buttons */
+.form-checkboxes .form-item,
+.form-radios .form-item {
+  margin: 0;
+}
+
+/* Main checkboxes label */
+label.option {
+  display: inline; /* Drupal gives us this, but helpful for static HTML/CSS */
+}
+
+.form-type-checkboxes label,
+.form-type-radios label {
+  margin-bottom: 20px;
+}
+
+.form-type-checkbox,
+.form-type-select {
+  position: relative;
+}
+
+/* Individual checkbox label */
+.form-type-checkbox label,
+.form-type-radio label {
+  padding-left: 10px;
+  margin-bottom: 10px;
+}
+
+.form-checkbox,
+.form-radio {
+  position: relative;
+  top: 3px;
+}
+
+@media screen and (-webkit-min-device-pixel-ratio:0) {
+/* 
+ * CSS Statements that only apply on webkit-based browsers (Chrome, Safari, etc.) – if there are more than just for checkboxes,
+ * move out to a separate section below all the other styles.
+ */
+  .form-checkbox,
+  .form-radio {
+    top: 4px;
+  }
+}
+
+
+
+.form-item .description {
+  position: relative;
+  top: 5px;
+}
+
+
+
+
+
+
+/* Fieldsets */
+
+/* Base styles */
+fieldset {
+  clear: both;
+  /* 1px less to allow for border */
+  padding: 19px 0 20px;
+  margin: 0 0 40px;
+  border-width: 0 0 1px;
+}
+
+.fieldset-description {
+  margin-bottom: 20px;
+}
+
+fieldset legend span {
+  display: block;
+  font-size: 20px;
+  font-weight: bold;
+  padding-top: 3px;
+  padding-bottom: 17px;
+}
+
+
+
+/* #09# - Overrides */
+html.js input.form-autocomplete {
+  background-position: 100% 13px;
+}
+
+html.js input.throbbing {
+  background-position: 100% -10px;
+}
+
+#edit-captcha-response { /* Smaller if mathematical */
+  width: 30px;
+}
+
+
+/* #07# - Tables */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  position: relative;
+  margin-top: 20px;
+}
+
+thead th,
+thead td {
+  padding-top: 11px;
+  background: #e5e5e5;
+  border-bottom: 0;
+}
+
+tbody {
+  border-top: 0;
+}
+
+tbody th,
+tbody td,
+tfoot th,
+tfoot td {
+  border-top: #fff solid 1px;
+  text-align: center;
+  background: #f3f3f3;
+}
+
+tfoot th,
+tfoot td {
+  padding-bottom: 9px;
+}
+
+td, th {
+  line-height: 20px;
+  padding: 11px 20px 8px;
+  vertical-align: middle;
+}
+
+
+/* #08# - Messages */
+div.messages,
+tr.messages {
+  position: relative;
+  top: -1px;
+  /* 1px less due to border */
+  padding: 19px 20px 19px 60px;
+  margin: 0 0 20px 0;
+  background-position: 20px 15px;
+  border-radius: 3px;
+}
+
+
+/* Clearfix */
+.clearfix:before,
+.clearfix:after {
+  content: "\0020";
+  display: block;
+  height: 0;
+  overflow: hidden;
+}
+
+.clearfix:after {
+  clear: both;
+}
+
+.clearfix {
+  zoom: 1;
+}
+
+
+
+/* Global styles */
+.page-width {
+  max-width: 980px;
+  margin: 0 auto;
+  position: relative;
+}
+
+.border-right {
+	border-right: 1px solid #eaeae4;
+}
+
+.block-border {
+	border: 1px solid #eaeae4;
+	border-radius: 4px;
+	padding: 0 0 12px 0;
+}
+
+.block-head {
+	border-bottom: 1px solid #deded4;
+	background: url(../images/block-hd-bck-rpt.png) repeat-x left bottom #f6f6f2;
+	height: 40px;
+}
+
+.block-border a.arrow-right {
+	background: url(../images/blue-arrow.png) no-repeat right 4px;
+	margin: 0 13px 0 0;
+}
+
+.black {
+  background-color: #000000;
+  color: #ffffff;
+}
+
+.grey {
+  background-color: #f5f3f0;
+}
+
+.grey a {
+  color: #085a8c;
+}
+
+.rounded,
+.image-wrapper.rounded img { /* Avoids complicated class injection on images */
+  border-radius: 3px;
+}
+
+.block.grey {
+  border-radius: 3px;
+}
+
+.block img {
+  display: block;
+}
+
+.no-borders {
+	border: 0;
+}
+
+.image-wrapper {
+  /* These ensure wrapping A elements are usable when images are floated around block level elements */
+  position: relative;
+  z-index: 20;
+}
+
+.image-wrapper.left {
+  margin: 0 20px 20px 0;
+}
+
+.image-wrapper.right {
+  margin: 0 0 20px 20px;
+}
+
+.block.col-4 .image-wrapper.right {
+  /* On smaller blocks, i.e. those headed with H3s, adjust the image to the hanging line and the bottom margin accordingly */
+  margin: 5px 0 15px 20px;
+}
+
+a.arrow-right {
+	background: url(../images/blue-arrow.png) no-repeat right 3px;
+	padding: 0 15px 0 0;
+	font-size: 13px;
+	text-transform: uppercase;
+}
+
+a.arrow-left {
+	background: url(../images/blue-arrow.png) no-repeat left 3px;
+	padding: 0 0 0 14px;
+	font-size: 13px;
+	text-transform: uppercase;
+}
+
+a.rss {
+	display: block;
+	background: url(../images/rss.png) no-repeat 0 0;
+	width: 16px;
+	height: 16px;
+	overflow: hidden;
+	text-indent: -5000px;
+}
+
+.block-head a.rss {
+	margin: 12px 12px 0 0;
+}
+
+/* Global block styles */
+.block {
+  margin-bottom: 15px;
+}
+
+.video-block {
+  width: 100%;
+}
+
+ul.events {
+	margin: 0 10px 15px 10px;
+	float: left;
+}
+
+.events .title {
+	font-size: 14px;
+	margin-top: -5px;
+}
+
+.weather a.arrow-left {
+	text-transform: none;
+	font-weight: bold;
+}
+
+
+/* Drupal fixes */
+
+/* Fix drop downs on admin menu */
+#admin-menu li ul {
+  top: auto;
+}
+
+/* Sort alignment of Drupal's leaf menu styles */
+li.expanded,
+li.collapsed,
+li.leaf {
+  padding: 0;
+}
+
+/* Fix style guide styles that bugger up my baseline grid! */
+#styleguide-header {
+  border: none;
+}
+
+h2.styleguide {
+  margin: 20px 0;
+  font-size: 28px;
+  line-height: 40px;
+  top: 10px;
+  color: #000;
+  text-transform: none;
+}
+
+.styleguide-description {
+  font-size: 14px;
+  margin: 0 0 20px;
+}
+
+#styleguide-header .item-list {
+  margin: 0 20px 20px 0;
+}
+
+#styleguide-header .break {
+  margin-bottom: 1px;
+}
+
+div.styleguide {
+  border: none;
+}
+
+/* Resolve the annoying extra spacing under the images – careful doing this across the whole site though */
+.styleguide img {
+  display: block;
+}
+
+@media screen and (-webkit-min-device-pixel-ratio:0) {
+/* 
+ * CSS Statements that only apply on webkit-based browsers (Chrome, Safari, etc.) – if there are more than just for checkboxes,
+ * move out to a separate section below all the other styles.
+ */
+ .primary-nav li a {
+		margin: 0 13px;
+ }

@@ -1,0 +1,21 @@
+<?php
+
+/**
+ * @file
+ * Install, update and requirements function for award_profiles.
+ */
+
+/**
+ * Add field_crm_committees field to committees taxonomy.
+ */
+function rmets_committee_document_update_7002() {
+  features_revert(
+    array(
+      'rmets_committee_document' => array(
+        'field',
+        'field_instance',
+        'views_view',
+      ),
+    )
+  );
+}

@@ -1,0 +1,864 @@
+<?php
+
+/**
+ * @file
+ * RMetS CPD Records module file.
+ */
+
+define('RMETS_CPD_ACCREDITATION_PRODUCT_TYPE', 'rmets_accreditation_application');
+define('RMETS_CPD_ACCREDITATION_PRODUCT_SKU', 'SMRT/ACC');
+
+use Drupal\rmets_membership_user\EntityWrapper\User\UserWrapper;
+use Drupal\rmets_crm\Api\Request\CompleteAccreditationApplicationRequest;
+use Drupal\rmets_crm\Api\Request\CreateAccreditationApplicationRequest;
+use Drupal\rmets_crm\Api\Request\InvalidRequestException;
+use Drupal\rmets_crm\Api\ApiServerException;
+use Drupal\rmets_crm\Model\AccreditationItem;
+use Drupal\rmets_wrapper\EntityWrapper\TaxonomyTerm\AccreditationTypeTermWrapper;
+use Drupal\rmets_crm\Api\Request\GetMembershipPackageAccreditationsRequest;
+
+
+/**
+ * Implements hook_permission().
+ */
+function rmets_cpd_accreditation_permission() {
+  return array(
+    'view edit own cpd accreditation applications' => array(
+      'title' => 'View & Edit Own CPD accreditation applications',
+      'description' => 'Allows user to be able to view & edit their own CPD accreditation applications',
+    ),
+    'review other users cpd accreditation applications' => array(
+      'title' => 'Review Other Users CPD accreditation applications',
+      'description' => 'Allows user to be able to review other users CPD accreditation applications',
+    ),
+    'view edit other users cpd accreditation applications' => array(
+      'title' => 'View & Edit Other Users CPD accreditation applications',
+      'description' => 'Allows user to be able to view & edit other users CPD accreditation applications',
+      'restrict access' => TRUE,
+    ),
+  );
+}
+
+/**
+ * Implements hook_node_access().
+ */
+function rmets_cpd_accreditation_node_access($node, $op, $account) {
+  if (is_string($node) && $node != 'cpd_accreditation_application') {
+    return NODE_ACCESS_IGNORE;
+  }
+
+  if (is_object($node) && $node->type != 'cpd_accreditation_application') {
+    return NODE_ACCESS_IGNORE;
+  }
+
+  $function = __FUNCTION__ . '__' . $op;
+  if (function_exists($function)) {
+    return $function($node, $op, $account);
+  }
+
+  return NODE_ACCESS_IGNORE;
+}
+
+/**
+ * Implements hook_node_access().
+ *
+ * @see rmets_cpd_accreditation_node_access();
+ */
+function rmets_cpd_accreditation_node_access__create($node, $op, $account) {
+  if (user_access('view edit own cpd accreditation applications')) {
+    return NODE_ACCESS_ALLOW;
+  }
+
+  return NODE_ACCESS_DENY;
+}
+
+/**
+ * Implements hook_node_access().
+ *
+ * @see rmets_cpd_accreditation_node_access();
+ */
+function rmets_cpd_accreditation_node_access__update($node, $op, $account) {
+  $node_wrapper = entity_metadata_wrapper('node', $node);
+
+  if (user_access('view edit other users cpd accreditation applications')) {
+    return NODE_ACCESS_ALLOW;
+  }
+
+  if (_rmets_cpd_is_reviewer($node, $account)) {
+    return NODE_ACCESS_DENY;
+  }
+
+  // User can edit their own application.
+  if ($node_wrapper->field_user->uid->value() == $account->uid && user_access('view edit own cpd accreditation applications')) {
+    $state_draft = _rmets_cpd_get_workflow_status_id_by_name('Draft');
+    if ($node_wrapper->field_status->value() == $state_draft) {
+      return NODE_ACCESS_ALLOW;
+    }
+    else {
+      return NODE_ACCESS_DENY;
+    }
+  }
+
+  return NODE_ACCESS_DENY;
+}
+
+/**
+ * Implements hook_node_access().
+ *
+ * @see rmets_cpd_accreditation_node_access();
+ */
+function rmets_cpd_accreditation_node_access__view($node, $op, $account) {
+  $node_wrapper = entity_metadata_wrapper('node', $node);
+
+  // User can view the application if it is their own.
+  if ($node_wrapper->field_user->uid->value() == $account->uid && user_access('view edit own cpd accreditation applications')) {
+    return NODE_ACCESS_ALLOW;
+  }
+
+  // Reviewers can access if they are a reviewer of it.
+  if (user_access('review other users cpd accreditation applications') && _rmets_cpd_is_reviewer($node, $account)) {
+    return NODE_ACCESS_ALLOW;
+  }
+
+  return NODE_ACCESS_DENY;
+}
+
+/**
+ * Gets the review access permission needed for this module.
+ *
+ * @return string
+ *   The access permission for this module.
+ */
+function _rmets_cpd_accreditation_application_review_access_permission() {
+  return 'review other users cpd accreditation applications';
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ *
+ * Alter the application accreditation form.
+ */
+function rmets_cpd_accreditation_form_cpd_accreditation_application_node_form_alter(&$form, &$form_state, $form_id) {
+  $is_field_user_prepopulated = empty($form['field_user'][LANGUAGE_NONE][0]['target_id']['#default_value']);
+  // Set the group tab descriptions from the variables.
+  _rmets_cpd_node_group_descriptions($form);
+
+  _rmets_cpd_node_add_field_status_description($form);
+
+  // Alter work experience.
+  $form['field_qualifying_work_experience'][LANGUAGE_NONE]['#access'] = FALSE;
+  $uid = $form['field_user']['und'][0]['target_id']['#entity']->uid;
+  $account = user_load($uid);
+  $field = field_view_field('user', $account, 'field_qualifying_work_experience');
+  // Remove the add link
+  $field['#suffix'] = '';
+  if (count($field['#items']) < 1) {
+    $field_output = '<strong>' . t('You have no work experience defined within your profile.') . '</strong>';
+  }
+  else {
+    // Remove the edit/ delete links.
+    foreach ($field['#items'] as $key => $value) {
+      $field[$key]['links'] = array();
+    }
+    $field_output = render($field);
+  }
+
+  $form['field_qualifying_work_experience']['#prefix'] = $field_output;
+  $form['field_qualifying_work_experience']['#suffix'] = '<p>You can alter these details on ' . l('your profile', 'user/' . $uid . '/mydetails/workexperience', array('attributes' => array('target'=>'_blank'))) . ' - Please note, if you amend these details or add extra information you will open your ‘My details’ tab/window and you will need to save and close this before returning to this page in the application.</p>';
+
+  // Alter education experience.
+  $form['field_qualifications'][LANGUAGE_NONE]['#access'] = FALSE;
+  //$form['field_areas_of_specialism']['#access'] = FALSE;
+  $form['field_file_attachment']['#access'] = FALSE;
+  $field1 = field_view_field('user', $account, 'field_qualifications');
+  $field1_output = (count($field1) < 1) ? '<strong>' . t('You have no qualifications defined within your profile.') . '</strong>' : render($field1);
+  //$field2 = field_view_field('user', $account, 'field_areas_of_specialism');
+  $field3 = field_view_field('user', $account, 'field_file_attachment');
+  $form['field_qualifications']['#prefix'] = $field1_output . render($field3);
+  $form['field_qualifications']['#suffix'] = '<p>You can alter these details on ' . l('your profile', 'user/' . $uid . '/mydetails/education', array('attributes' => array('target'=>'_blank'))) . ' - Please note, if you amend these details or add extra information you will open your ‘My details’ tab/window and you will need to save and close this before returning to this page in the application.</p>';
+
+  // If its a node add form, and field_user is prepopulated, prepopulate other user fields.
+  $is_node_add = is_null($form['nid']['#value']);
+  if ($is_node_add && !$is_field_user_prepopulated) {
+    $account = user_load($_GET['field_user']);
+    if (empty($account)) {
+      drupal_not_found();
+    }
+
+    $user_wrapper = new UserWrapper($account);
+    $account_full_name = $user_wrapper->getTitle() . ' ' . $user_wrapper->getForename() . ' ' . $user_wrapper->getSurname();
+    $form['field_full_name'][LANGUAGE_NONE][0]['value']['#default_value'] = $account_full_name;
+    $form['field_membership_number'][LANGUAGE_NONE][0]['value']['#default_value'] = $user_wrapper->getMembershipNumber();
+    $form['field_email'][LANGUAGE_NONE][0]['email']['#default_value'] = $user_wrapper->getEmail();
+  }
+
+  // Hide unneeded fields.
+  _rmets_cpd_node_hide_fields($form);
+  // Update the 'add cpd record' button name.
+  _rmets_cpd_node_change_add_cpd_records_button_name($form);
+  // Add the required field asterix marker.
+  _rmets_cpd_node_add_required_field_markers($form);
+
+  // Add the apply button.
+  $is_admin = user_access('view edit other users cpd accreditation applications');
+
+  $submit_function = '_rmets_cpd_accreditation_node_accreditation_application_submit';
+  _rmets_cpd_node_add_apply_button($form, $is_node_add, $is_admin, $submit_function);
+}
+
+/**
+ * Implements hook_field_group_build_pre_render_alter().
+ */
+function rmets_cpd_accreditation_field_group_build_pre_render_alter(& $element) {
+  // Add the rmets_cpd_accreditation javascript.
+  $element['#attached']['js'][] = drupal_get_path('module', 'rmets_cpd_accreditation') . '/rmets_cpd_accreditation.js';
+}
+
+/**
+ * Implements hook_form_BASE_FORM_ID_alter for hook_form_alter().
+ *
+ * This saves additional information about the submit review required fields.
+ */
+function rmets_cpd_accreditation_form_field_ui_field_edit_form_alter(&$form, &$form_state, $form_id) {
+  _rmets_cpd_form_field_ui_field_edit_form_alter($form, $form_state, $form_id, 'cpd_accreditation_application');
+}
+
+/**
+ * Form submittion handler for rmets_cpd_accreditation_form_cpd_accreditation_application_node_form_alter().
+ *
+ * @see rmets_cpd_accreditation_form_cpd_accreditation_application_node_form_alter().
+ */
+function _rmets_cpd_accreditation_node_accreditation_application_submit($form, &$form_state){
+  // Does this accreditation need payment.
+  $accreditation_needs_payment = !_rmets_cpd_accreditation_has_user_already_paid_for_accreditation();
+
+  // Change form state.
+  // Set the status to 'awaiting payment' if payment is required, otherwise 'pending'.
+  $state_pending = _rmets_cpd_get_workflow_status_id_by_name('Pending');
+  $state_awaiting_payment = _rmets_cpd_get_workflow_status_id_by_name('Awaiting payment');
+  $status = $accreditation_needs_payment ? $state_awaiting_payment : $state_pending;
+  $form_state['values']['field_status'][LANGUAGE_NONE][0]['workflow']['workflow_sid'] = $status;
+
+  // Create the accreditation application in CRM if it hasn't already been created.
+  if (empty($form_state['values']['field_crm_accred_app_id'][LANGUAGE_NONE][0]['value'])) {
+    $account = user_load($form_state['values']['field_user'][LANGUAGE_NONE][0]['target_id']);
+    $account_wrapper = new UserWrapper($account);
+    $accreditation_item_id = $form_state['values']['field_crm_accreditation_type'][LANGUAGE_NONE][0]['value'];
+    $application_id = _rmets_cpd_accreditation_create_crm_application($account_wrapper->getCrmContactId(), $accreditation_item_id);
+    $form_state['values']['field_crm_accred_app_id'][LANGUAGE_NONE][0]['value'] = $application_id;
+  }
+
+  // Submit form.
+  node_form_submit($form, $form_state);
+
+  // Redirect the user to the node view page to make payment for accreditation.
+  if ($accreditation_needs_payment) {
+    $_GET['destination'] = $form['path']['alias']['#default_value'];
+  }
+}
+
+/**
+ * Implements hook_node_validate().
+ */
+function rmets_cpd_accreditation_node_validate($node, $form, &$form_state) {
+  if ($node->type != 'cpd_accreditation_application') {
+    return;
+  }
+
+  $node_wrapper = entity_metadata_wrapper('node', $node);
+
+  // If this is an admin updating the application status to 'accepted', then
+  // make sure that the member's accreditation type has been selected.
+  $state_acceptable = _rmets_cpd_get_workflow_status_id_by_name('Acceptable');
+  if (isset($form_state['values']['field_status'][LANGUAGE_NONE][0]['workflow']['workflow_sid']) && $form_state['values']['field_status'][LANGUAGE_NONE][0]['workflow']['workflow_sid'] == $state_acceptable) {
+    $membership_number = $form_state['values']['field_membership_number'][LANGUAGE_NONE][0]['value'];
+    $accreditation_product_id = $form_state['values']['field_awarded_accreditation'][LANGUAGE_NONE][0]['target_id'];
+    if (!is_null($accreditation_product_id) || $accreditation_product_id != '') {
+      // If the member accreditation has been selected, then update enterprise.
+      try {
+        $account_wrapper = $node_wrapper->field_user;
+        if (empty($membership_number) || $account_wrapper->field_membership_number->value() != $membership_number) {
+          form_set_error('field_membership_number',
+            t('The membership number on the form "!form_number" does not match that on the members account "!account_number". Please check this information then try again.',
+              array(
+                '!form_number' => $membership_number,
+                '!account_number' => $account_wrapper->field_membership_number->value(),
+              )
+            )
+          );
+
+          return;
+        }
+
+        // Mark the application as complete in CRM.
+        _rmets_cpd_accreditation_complete($node_wrapper->field_crm_accred_app_id->value());
+      }
+      catch (Exception $e) {
+        form_set_error('field_awarded_accreditation', $e->getMessage());
+      }
+    }
+    else {
+      form_set_error('field_awarded_accreditation', 'Please select the accreditation that this member has been awarded.');
+    }
+  }
+}
+
+/**
+ * Implements hook_node_presave().
+ */
+function rmets_cpd_accreditation_node_presave($node) {
+  if ($node->type != 'cpd_accreditation_application') {
+    return;
+  }
+
+  // This creates a title so the content listing page is not useless.
+  $account = user_load($node->field_user[LANGUAGE_NONE][0]['target_id']);
+  $account_wrapper = new UserWrapper($account);
+  $node_wrapper = entity_metadata_wrapper('node', $node);
+
+  // Application type.
+  if (isset($node->field_crm_accreditation_type[LANGUAGE_NONE][0])) {
+    $accreditation_item_id = $node_wrapper->field_crm_accreditation_type->value();
+    /** @var AccreditationItem $accreditation_item */
+    $accreditation_item = $account_wrapper->getAccreditationApplicationDetails($accreditation_item_id);
+    if (empty($accreditation_item)) {
+      form_set_error('field_type_of_accreditation', 'There was a problem getting the relevant accreditation information from CRM.');
+      return;
+    }
+    $product_title = $accreditation_item->getName();
+
+    // Create the CRM Accreditation Application.
+    if (empty($node_wrapper->field_crm_accred_app_id->value())) {
+      $application_id = _rmets_cpd_accreditation_create_crm_application($account_wrapper->getCrmContactId(), $accreditation_item_id);
+      $node_wrapper->field_crm_accred_app_id->set($application_id);
+    }
+  }
+  else {
+    $product_title = 'UNKNOWN';
+  }
+
+  if (is_object($account)) {
+    $node->title = 'Accreditation Application - ' . $product_title . ' - ' . $account_wrapper->getForename() . ' ' . $account_wrapper->getSurname() . ' - ' . ' (' . $node->nid . ') ' . date('d M Y', $node->created);
+  }
+  else {
+    $node->title = 'Accreditation Application - ' . $product_title . ' - NO USER - ' . ' (' . $node->nid . ') ' . date('d M Y', $node->created);
+  }
+
+  try {
+    $next_cpd_date = NULL;
+    if (workflow_node_current_state($node_wrapper->value(), 'node', 'field_status') == 11) {
+      $next_cpd_date = $node_wrapper->field_next_cpd_submission_date->value();
+      if (empty($next_cpd_date)) {
+        // If there isn't one on the node, try the user
+        $next_cpd_date = $account_wrapper->field_next_cpd_submission_date->value();
+
+        if (!empty($next_cpd_date)) {
+          // Move the next submission date on.
+          $accreditation_type = $node_wrapper->field_crm_accreditation_type->value();
+          $accreditation_type_wrapper = AccreditationTypeTermWrapper::getByCrmAccreditationItemId($account_wrapper, $accreditation_type);
+
+          // Find the period of time before next review.
+          $renewal_frequency = $accreditation_type_wrapper->getRenewalFrequency();
+          $renewal_unixtime = strtotime('+' . $renewal_frequency, $next_cpd_date);
+
+          // Set this on the user and the node.
+          $account_wrapper->field_next_cpd_submission_date->set($renewal_unixtime);
+          $account_wrapper->save();
+
+          $node_wrapper->field_next_cpd_submission_date->set($renewal_unixtime);
+        }
+      }
+    }
+  }
+  catch (Exception $e) {
+    if (user_access('administer cpd section')) {
+      drupal_set_message($e->getMessage(), 'error');
+    }
+    watchdog_exception('rmets_cpd_accreditation', $e);
+  }
+}
+
+/**
+ * Create the CRM Accreditation Application.
+ *
+ * @param string $contact_crm_id
+ * @param string $accreditation_item_id
+ *
+ * @return mixed|null
+ *   The CRM Accreditation Application Id | NULL
+ */
+function _rmets_cpd_accreditation_create_crm_application($contact_crm_id, $accreditation_item_id) {
+  try {
+    $request = new CreateAccreditationApplicationRequest();
+    $request->setGuid(variable_get('rmets_crm_api_guid', ''));
+    $request->setContactId($contact_crm_id);
+    $request->setAccreditationItemId($accreditation_item_id);
+
+    /** @var \Drupal\rmets_crm\Api\CrmService $api */
+    $api = rmets_crm_get_api();
+    $response = $api->createAccreditationApplication($request);
+    return $response->getId();
+  }
+  catch (InvalidRequestException $e) {
+    watchdog('rmets_cpd_accreditation', 'InvalidRequestException: ' . $e->getMessage(), array(), WATCHDOG_CRITICAL);
+    drupal_set_message('There was been an error creating this Application.' . $e->getMessage(), 'error');
+    return NULL;
+  }
+  catch (ApiServerException $apie) {
+    watchdog('rmets_cpd_accreditation', 'Unable to communicate with the CRM API: ' . $apie->getMessage(), array(), WATCHDOG_CRITICAL);
+    drupal_set_message('There was been an error creating this Application.' . $apie->getMessage(), 'error');
+    return NULL;
+  }
+}
+
+/**
+ * Implements hook_node_insert().
+ */
+function rmets_cpd_accreditation_node_insert($node) {
+  if ($node->type != 'cpd_accreditation_application') {
+    return;
+  }
+  drupal_register_shutdown_function('_rmets_cpd_accreditation_node_post_insert', $node);
+}
+
+/**
+ * Perform a node_save after insert to set the nid in the title.
+ *
+ * @param $node
+ */
+function _rmets_cpd_accreditation_node_post_insert($node) {
+  node_save($node);
+}
+
+/**
+ * Implements hook_preprocess_node().
+ */
+function rmets_cpd_accreditation_preprocess_node(&$vars) {
+  global $user;
+
+  // Check that the user has access to the CPD section before showing the link.
+  if (!rmets_cpd_access($user)) {
+    return;
+  }
+
+  // Show the relevant accreditation type based upon if a new CRM application has been set.
+  if (empty($vars['field_crm_accreditation_type']) && isset($vars['content']['field_type_of_accreditation'])) {
+    $vars['content']['field_type_of_accreditation']['#title'] = substr($vars['content']['field_type_of_accreditation']['#title'], 0, -6);
+  }
+  else {
+    if (isset($vars['field_type_of_accreditation'])) {
+      $vars['content']['field_type_of_accreditation']['#access'] = FALSE;
+    }
+  }
+
+  // Only show the Pay Online button if the status is 'awaiting payment'.
+  $state_awaiting_payment = _rmets_cpd_get_workflow_status_id_by_name('Awaiting payment');
+  if ($vars['type'] == 'cpd_accreditation_application' && $vars['field_status'][0]['value'] == $state_awaiting_payment) {
+    // Add the form to the pay online.
+    $vars['cpd_accreditation_pay_online'] = drupal_get_form('rmets_cpd_accreditation_pay_online_form', $vars['nid'], $vars['field_crm_accreditation_type'][LANGUAGE_NONE][0]['value']);
+  }
+}
+
+/**
+ * Pay online form handler.
+ */
+function rmets_cpd_accreditation_pay_online_form($form, $form_state, $nid, $crm_accreditation_item_id) {
+  $form = array();
+
+  $node = node_load($nid);
+  $node_wrapper = entity_metadata_wrapper('node', $node);
+  $account = $node_wrapper->field_user->value();
+  $account_wrapper = new UserWrapper($account);
+  $accreditation_item_id = $node_wrapper->field_crm_accreditation_type->value();
+
+  if (empty($accreditation_item_id)) {
+    drupal_set_message('There has been a problem getting the relevant accreditation information. Please contact a member of the society.', 'error');
+  }
+  else {
+    /** @var AccreditationItem $accreditation_item */
+    $accreditation_item = $account_wrapper->getAccreditationApplicationDetails($accreditation_item_id);
+    if (empty($accreditation_item)) {
+      return;
+    }
+
+    $price_display = number_format($accreditation_item->getJoiningFee(), 2);
+
+    $form['accreditation_type_product_id'] = array(
+      '#type' => 'hidden',
+      '#default_value' => $crm_accreditation_item_id,
+    );
+
+    $form['accreditation_nid'] = array(
+      '#type' => 'hidden',
+      '#default_value' => $nid,
+    );
+
+    $form['info_text'] = array(
+      '#markup' => "<div class=\"call-for-payment\"><h2>Payment required</h2><p>You need to make a payment of <strong>&pound;{$price_display}</strong> for this application. Please click the 'Pay Online' button below to make a payment.</p></div>",
+    );
+
+    $form['submit'] = array(
+      '#type' => 'submit',
+      '#value' => t('Pay Online'),
+      '#submit' => array('rmets_cpd_acceditation_add_to_cart'),
+    );
+  }
+
+  return $form;
+}
+
+/**
+ * Implements hook_workflow().
+ */
+function rmets_cpd_accreditation_workflow($op, $id, $new_sid, $entity, $force, $entity_type = '', $field_name = '') {
+  if ($entity_type != 'node' || $entity->type != 'cpd_accreditation_application') {
+    return;
+  }
+
+  // @todo set transition permitted -> access if already paid, ??
+  // DEBUG:
+  // dpm(array($op, $id, $new_sid, $entity, $force, $entity_type, $field_name));
+
+  // Example usage:
+  /*
+  switch ($op) {
+    case 'transition permitted':
+      return TRUE;
+  }
+  */
+
+}
+
+/**
+ * Adds the selected accreditation product to a new order.
+ */
+function rmets_cpd_acceditation_add_to_cart($form, &$form_state) {
+  global $user;
+
+  // Get the default product from the SKU.
+  $product = commerce_product_load_by_sku(RMETS_CPD_ACCREDITATION_PRODUCT_SKU);
+
+  $accreditation_item_id = $form_state['values']['accreditation_type_product_id'];
+  $account = user_load($user->uid);
+  $account_wrapper = new UserWrapper($account);
+  /** @var AccreditationItem $accreditation_item */
+  $accreditation_item = $account_wrapper->getAccreditationApplicationDetails($accreditation_item_id);
+  if (empty($accreditation_item)) {
+    if (empty(drupal_get_messages())) {
+      drupal_set_message('There appears to have been a problem with getting your accreditation information.', 'error');
+    }
+    return;
+  }
+
+  // Create a new order for this user.
+  $order = commerce_order_new($user->uid);
+  commerce_order_save($order);
+
+  $data = $form_state['values'];
+  $data['price_to_pay'] = $accreditation_item->getJoiningFee();
+  $data['title_of_item'] = 'Accreditation Application: ' . $accreditation_item->getName();
+
+  // Add the line item for the accreditation to the order.
+  $line_item = commerce_product_line_item_new($product, 1, $order->order_id, $data, 'rmets_accreditation');
+
+  // Add the nid to the line item.
+  $nid = $form_state['values']['accreditation_nid'];
+  $line_item_wrapper = entity_metadata_wrapper('commerce_line_item', $line_item);
+  $line_item_wrapper->field_rmets_accreditation_nid->set($nid);
+
+  // Resave the line item with nid info.
+  $line_item_wrapper->save();
+
+  $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
+  $order_wrapper->commerce_line_items[] = $line_item;
+
+  // Add customer profiles to the order.
+  _rmets_cpd_accreditation_order_add_user_profiles($order, $user);
+
+  // Set the order status to 'checkout_review' for the user to make payment.
+  $order_wrapper->status->set('checkout_review');
+
+  // Allow modules to prepare this as necessary. This hook is defined by the
+  // Product Pricing module.
+  drupal_alter('commerce_product_calculate_sell_price_line_item', $line_item);
+
+  // Process the unit price through Rules so it reflects the user's actual
+  // purchase price.
+  rules_invoke_event('commerce_product_calculate_sell_price', $line_item);
+
+  // Save the item to the shopping cart.
+  $order_wrapper->save();
+
+  // Redirect to the checkout page.
+  drupal_goto('checkout/' . $order->order_id);
+}
+
+/**
+ * Implements hook_commerce_cart_line_item_refresh().
+ *
+ * Alter the price in basket and checkout.
+ */
+function rmets_cpd_accreditation_commerce_cart_line_item_refresh($line_item, $order_wrapper) {
+  if ($line_item->line_item_label == RMETS_CPD_ACCREDITATION_PRODUCT_SKU && isset($line_item->data['price_to_pay'])) {
+    $price = $line_item->data['price_to_pay'] * 100;
+    $line_item->commerce_unit_price[LANGUAGE_NONE]['0']['amount'] = $price;
+    //alter the base_price component
+    $line_item->commerce_unit_price[LANGUAGE_NONE]['0']['data']['components']['0']['price']['amount'] = $price;
+  }
+}
+
+/**
+ * Implements hook_commerce_line_item_type_info_alter().
+ */
+function rmets_cpd_accreditation_commerce_line_item_type_info_alter(&$line_item_types) {
+  $line_item_types['rmets_accreditation']['callbacks']['title'] = 'rmets_cpd_accreditation_smartimpact_product_title';
+}
+
+/**
+ * Callback function for setting the line item title.
+ */
+function rmets_cpd_accreditation_smartimpact_product_title($line_item) {
+  return check_plain($line_item->data['title_of_item']);
+}
+
+/**
+ * Add the user profiles to an order.
+ *
+ * @param stdClass $order
+ *   The order object for the profiles to be added to.
+ * @param stdClass $user
+ *   The user object to build the profiles from.
+ */
+function _rmets_cpd_accreditation_order_add_user_profiles(&$order, $user) {
+  $user_wrapper = entity_metadata_wrapper('user', $user);
+  $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
+
+  $commerce_customer_profiles = commerce_customer_profile_types();
+  foreach ($commerce_customer_profiles as $profile_type => $profile_data) {
+    // Create a new profile.
+    $profile = commerce_customer_profile_new($profile_type, $user->uid);
+
+    // Populate the profile with the default address fields.
+    $profile->commerce_customer_address = array(
+      LANGUAGE_NONE => array(
+        0 => addressfield_default_values()
+      )
+    );
+
+    $profile_wrapper = entity_metadata_wrapper('commerce_customer_profile', $profile);
+    $order_profile = 'commerce_customer_' . $profile_type;
+
+    if ($profile_type == 'shipping') {
+      $order_profile = 'commerce_customer_shipping';
+      // full name.
+      $name_line = $user_wrapper->field_forenames->value() . ' ' . $user_wrapper->field_surname->value();
+      $profile_wrapper->commerce_customer_address->name_line->set($name_line);
+    }
+
+    if ($profile_type == 'billing') {
+      $order_profile = 'commerce_customer_billing';
+       // First name.
+      $profile_wrapper->commerce_customer_address->first_name->set($user_wrapper->field_forenames->value());
+       // Last name.
+      $profile_wrapper->commerce_customer_address->last_name->set($user_wrapper->field_surname->value());
+    }
+
+    // @todo Get the users address from Enterprise.
+    // Address line 1.
+    //$profile_wrapper->commerce_customer_address->thoroughfare->set('line 1');
+    // Address line 2.
+    //$profile_wrapper->commerce_customer_address->premise->set('line 2');
+    // City.
+    //$profile_wrapper->commerce_customer_address->locality->set('city');
+    // County.
+    //$profile_wrapper->commerce_customer_address->administrative_area->set('county');
+    // Post code.
+    //$profile_wrapper->commerce_customer_address->postal_code->set('postcode');
+
+    // You should pass the entire $profile object as parameter.
+    $profile_wrapper->save();
+
+    // Associate the customer profile to your order.
+    $order_wrapper->{$order_profile} = $profile;
+  }
+}
+
+/**
+ * Checks if the user has paid for any accreditation products.
+ *
+ * This checks if the user has paid for any accreditation products within the
+ * last two years.
+ *
+ * @return bool
+ *   TRUE if they have already paid | FALSE.
+ */
+function _rmets_cpd_accreditation_has_user_already_paid_for_accreditation() {
+  $accreditation_has_already_been_paid = &drupal_static(__FUNCTION__);
+
+  if (isset($accreditation_has_already_been_paid)) {
+    return $accreditation_has_already_been_paid;
+  }
+
+  global $user;
+
+  // Get the accreditation application product.
+  $product_sku = commerce_product_load_by_sku(RMETS_CPD_ACCREDITATION_PRODUCT_SKU)->sku;
+
+  // Check users order history to see if they have paid already within the last 2 years.
+  $query = db_select('commerce_order', 'cord');
+  $query->join('commerce_line_item', 'li', 'cord.order_id = li.order_id');
+  $query->join('field_data_commerce_product', 'prod', 'li.line_item_id = prod.entity_id');
+  $query->condition('cord.uid', $user->uid, '=')
+        ->condition('cord.status', 'completed', '=')
+        ->condition('cord.created', strtotime('-2 years'), '>')
+        ->condition('line_item_label', $product_sku)
+        ->fields('cord', array('order_id'));
+
+  $result = $query->execute();
+
+
+  // @todo convert the above to user EntityFieldQuery
+  /*$query = new EntityFieldQuery();
+  $entities = $query->entityCondition('entity_type', 'field_collection_item')
+    ->propertyCondition('item_id', $node_review_ids, 'IN')
+    ->propertyCondition('field_name', 'field_reviews')
+    ->fieldCondition('field_reviewer', 'target_id', $user->uid)
+    ->execute();
+  print_r($entities);*/
+
+
+  return $accreditation_has_already_been_paid = $result->rowCount() > 0;
+}
+
+/**
+ * Get the list of products that are for accreditation application.
+ *
+ * This builds an array of the accreditation products, with the key being the
+ * product SKU and the value being the product title.
+ *
+ * @return array
+ *   Array of accreditation products.
+ */
+function _rmets_cpd_accreditation_get_products() {
+  $application_products = array();
+  $accreditation_products = commerce_product_load_multiple(array(), array('type' => RMETS_CPD_ACCREDITATION_PRODUCT_TYPE));
+  foreach ($accreditation_products as $product) {
+    if ($product->status < 1) {
+      continue;
+    }
+    $application_products[$product->sku] = $product->title;
+  }
+  return $application_products;
+}
+
+/**
+ * Determine if a product is an accreditation product.
+ *
+ * @param commerce_product $product
+ *   The product to check.
+ *
+ * @return bool
+ *   TRUE if an accreditation product.
+ *
+ * @see rmets_subscription_purchase_subscription().
+ */
+function rmets_accreditation_subscription_is_accreditation_product($product) {
+  $accreditation_products = _rmets_cpd_accreditation_get_products();
+  return array_key_exists($product->sku, $accreditation_products);
+}
+
+/**
+ * Implements hook_views_pre_build().
+ */
+function rmets_cpd_accreditation_views_pre_build($view) {
+  // Add the intro text to the header of the views.
+  if ($view->current_display == 'cpd_accreditation_application_page') {
+    $intro_text = variable_get('rmets_' . $view->current_display . '_list_intro', '');
+    $intro_content = str_replace('[' . $view->current_display . '_intro_text]', $intro_text, $view->header['area_1']->options['content']);
+    $view->header['area_1']->options['content'] = $intro_content;
+
+    // Add print link to the footer.
+    /*$link = print_insert_link();
+    dpm($link);
+    $footer_print_link = str_replace('[print_pdf_link]', $link, $view->footer['area']->options['content']);
+    $view->footer['area']->options['content'] = $footer_print_link;*/
+  }
+}
+
+/**
+ * Completes the accreditation item in CRM.
+ *
+ * @param string $accreditation_application_id
+ */
+function _rmets_cpd_accreditation_complete($accreditation_application_id) {
+  if (empty($accreditation_application_id)) {
+    drupal_set_message('Due to this accreditation having been created before the new CRM system was in place, you will need to manually create this subscription in CRM for this contact.', 'warning');
+    return;
+  }
+
+  try {
+    $request = new CompleteAccreditationApplicationRequest();
+    $request->setGuid(variable_get('rmets_crm_api_guid', ''));
+    $request->setAccreditationApplicationId($accreditation_application_id);
+
+    /** @var \Drupal\rmets_crm\Api\CrmService $api */
+    $api = rmets_crm_get_api();
+    $api->completeAccreditationApplication($request);
+  }
+  catch (InvalidRequestException $e) {
+    watchdog('rmets_cpd_accreditation', 'InvalidRequestException: ' . $e->getMessage(), array(), WATCHDOG_CRITICAL);
+    drupal_set_message('There was been an error completing this Application.', 'error');
+  }
+  catch (ApiServerException $apie) {
+    watchdog('rmets_cpd_accreditation', 'Unable to communicate with the CRM API: ' . $apie->getMessage(), array(), WATCHDOG_CRITICAL);
+    drupal_set_message('There was been an error completing this Application.', 'error');
+  }
+}
+
+/**
+ * Implements hook_cron().
+ *
+ * Send a CPD Accreditation reminder email to users.
+ */
+function rmets_cpd_accreditation_cron() {
+  $current_date = date('Y-m-d');
+  $last_processed_date = variable_get('rmets_cpd_accreditation_last_email_reminder_sent', '');
+
+  // Check if the reminder emails have already been sent out today.
+  if ($current_date == $last_processed_date) {
+    return;
+  }
+
+  // Send the email reminders for relevant users.
+  _rmets_cpd_accreditation_user_email_reminder();
+
+  // Set the last sent date.
+  variable_set('rmets_cpd_accreditation_last_email_reminder_sent', date('Y-m-d'));
+}
+
+/**
+ * Finds the users that need to be sent an email and passes them to the rule.
+ */
+function _rmets_cpd_accreditation_user_email_reminder() {
+  // Get all the cpd users that are due a review in the next 3 months and haven't
+  // been sent an email in the last 3 months.
+  $query = db_select('users', 'u');
+  $query->join('field_data_field_next_cpd_submission_date', 'nsd', 'u.uid = nsd.entity_id AND nsd.entity_type = :entity_type', array(':entity_type' => 'user'));
+  $query->leftJoin('field_revision_field_last_cpd_reminder_date', 'lrd', 'u.uid = lrd.entity_id AND lrd.entity_type = :entity_type', array(':entity_type' => 'user'));
+  $query->fields('u', array('uid'))
+    ->isNotNull('nsd.field_next_cpd_submission_date_value')
+    ->condition('nsd.field_next_cpd_submission_date_value', strtotime('+3 months'), '<=')
+    ->condition(
+      db_or()
+      ->condition('lrd.field_last_cpd_reminder_date_value', strtotime('-3 months'), '<')
+      ->isNull('lrd.field_last_cpd_reminder_date_value')
+    );
+
+  $result = $query->execute();
+  while($record = $result->fetchAssoc()) {
+    // Invoke the rule to send the email reminder for each user.
+    $user = user_load($record['uid']);
+    //printf("send email to %s (%s)\n", $user->email, $user->uid);
+    rules_invoke_event('rmets_cpd_accreditation_user_review_due_reminder', $user);
+  }
+}

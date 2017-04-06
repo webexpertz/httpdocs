@@ -1,0 +1,1460 @@
+<?php
+
+/**
+ * @file
+ * RMetS CPD module file.
+ */
+
+use Drupal\rmets_crm\Model\AccreditationItem;
+use Drupal\rmets_membership_user\EntityWrapper\User\UserWrapper;
+
+/**
+ * Implements hook_menu().
+ */
+function rmets_cpd_menu() {
+  $items = array();
+
+  // Admin Pages.
+
+  $items['admin/config/system/rmets-cpd-settings'] = array(
+    'title' => 'RMetS CPD Settings',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('rmets_cpd_settings'),
+    'access arguments' => array('access site admin'),
+    'file' => 'rmets_cpd.admin.inc',
+    'file path' => drupal_get_path('module', 'rmets_cpd'),
+  );
+
+  $items['accsys'] = array(
+    'page callback' => 'rmets_cpd_my_cpd',
+    'access callback' => TRUE,
+    'file' => 'rmets_cpd.pages.inc',
+    'file path' => drupal_get_path('module', 'rmets_cpd'),
+  );
+
+  // User CPD tabs.
+
+  $items['user/%user/cpd'] = array(
+    'title' => 'My CPD',
+    'page callback' => 'rmets_cpd_about',
+    //'page arguments' => array(1),
+    'access callback' => 'rmets_cpd_access',
+    'access arguments' => array(1),
+    'type' => MENU_LOCAL_TASK,
+    'file' => 'rmets_cpd.pages.inc',
+    'file path' => drupal_get_path('module', 'rmets_cpd'),
+    'weight' => 5,
+  );
+
+  $items['user/%user/cpd/about'] = array(
+    'title' => 'About RMetS CPD',
+    'page callback' => 'rmets_cpd_about',
+    'page arguments' => array(1),
+    'access callback' => 'rmets_cpd_access',
+    'access arguments' => array(1),
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'file' => 'rmets_cpd.pages.inc',
+    'file path' => drupal_get_path('module', 'rmets_cpd'),
+    'weight' => -1,
+  );
+
+  $items['cpd/review/record/%node'] = array(
+    'title' => 'Review CPD Record',
+    'page callback' => 'rmets_cpd_reviewer_view_node',
+    'page arguments' => array(3),
+    'access callback' => 'rmets_cpd_reviewer_record_access',
+    'access arguments' => array(3),
+  );
+
+  $items['cpd/review/report/%node'] = array(
+    'title' => 'Review CPD Report',
+    'page callback' => 'rmets_cpd_reviewer_view_node',
+    'page arguments' => array(3),
+    'access callback' => 'rmets_cpd_reviewer_report_access',
+    'access arguments' => array(3),
+  );
+
+  $items['cpd/review/application/%node'] = array(
+    'title' => 'Review Accreditation Application',
+    'page callback' => 'rmets_cpd_reviewer_view_node',
+    'page arguments' => array(3),
+    'access callback' => 'rmets_cpd_reviewer_application_access',
+    'access arguments' => array(3),
+  );
+
+  return $items;
+}
+
+/**
+ * Implements hook_menu_alter().
+ */
+function rmets_cpd_menu_alter(&$items) {
+  $items['admin/reports']['access callback'] = 'rmets_cpd_drupal_reports_access';
+}
+
+function rmets_cpd_drupal_reports_access() {
+  return user_access('access site reports') || user_access('view cpd reports');
+}
+
+/**
+ * Implements hook_permission().
+ */
+function rmets_cpd_permission() {
+  return array(
+    'administer cpd section' => array(
+      'title' => 'Administer CPD',
+      'description' => 'Administer CPD Section of the site',
+    ),
+    'view cpd reports' => array(
+      'title' => 'View CPD reports',
+      'description' => 'View CPD reports',
+    ),
+  );
+}
+
+/**
+ * Determine if the logged in user can access CPD records of an specific user.
+ *
+ * @param User|int $account
+ *   The user account needing to be accessed or uid for an account being accessed.
+ *
+ * @return bool
+ *   TRUE if the logged in user can accessed the specified users account.
+ */
+function rmets_cpd_access($account) {
+  global $user;
+
+  if (is_numeric($account) && $account > 0) {
+    $account = user_load($account);
+  }
+
+  if (empty($account) || !is_object($account) || empty($account->uid)) {
+    return FALSE;
+  }
+
+  if (user_access('administer cpd section', $user)) {
+    return TRUE;
+  }
+
+  // Temporary role checking for 'cpd tester' role.
+  $user_is_member = array_search('member', $account->roles);
+  //$user_is_member = array_search('cpd tester', $user->roles);
+  if (!$user_is_member) {
+    return FALSE;
+  }
+
+  if (user_access('view edit own cpd records', $user) && $user->uid == $account->uid) {
+    return TRUE;
+  }
+
+  if (user_access('view other users cpd records', $user) || user_access('view edit other users cpd records', $user)) {
+    return TRUE;
+  }
+
+  return FALSE;
+}
+
+/**
+ * Render the node for viewing by a reviewer.
+ *
+ * @param $node
+ *   The node object.
+ *
+ * @return string
+ *   The node display to render.
+ */
+function rmets_cpd_reviewer_view_node($node) {
+  $elements = node_view($node);
+  return drupal_render($elements);
+}
+
+/**
+ * Determine if a reviewer is allow access to a cpd record node.
+ *
+ * @param $node
+ *   Node object.
+ *
+ * @return bool
+ *   True is the user is allowed access | false if not.
+ */
+function rmets_cpd_reviewer_record_access($node) {
+  return _rmets_cpd_reviewer_access($node, 'cpd_record');
+}
+
+/**
+ * Determine if a reviewer is allow access to a cpd report node.
+ *
+ * @param $node
+ *   Node object.
+ *
+ * @return bool
+ *   True is the user is allowed access | false if not.
+ */
+function rmets_cpd_reviewer_report_access($node) {
+  return _rmets_cpd_reviewer_access($node, 'cpd_report_review');
+}
+
+/**
+ * Determine if a reviewer is allow access to an application node.
+ *
+ * @param $node
+ *   Node object.
+ *
+ * @return bool
+ *   True is the user is allowed access | false if not.
+ */
+function rmets_cpd_reviewer_application_access($node) {
+  return _rmets_cpd_reviewer_access($node, 'cpd_accreditation_application');
+}
+
+/**
+ * Determine if a reviwer can access a particular node type.
+ *
+ * @param $node
+ *   Node object.
+ * @param string $node_type
+ *   The node type.
+ *
+ * @return bool
+ *   True is the user is allowed access | false if not.
+ */
+function _rmets_cpd_reviewer_access($node, $node_type) {
+  if ($node->type !== $node_type) {
+    return FALSE;
+  }
+
+  if (_rmets_cpd_is_reviewer($node)) {
+    return TRUE;
+  }
+
+  return FALSE;
+}
+
+/**********************************************************
+ *
+ * Review / Accreditation node edit/ validation functions.
+ *
+ **********************************************************/
+
+/**
+ * Returns the workflow state id from a name.
+ *
+ * @param string $name
+ *   The name of the workflow state.
+ *
+ * @return int
+ *   The workflow state id || -1 if not found.
+ */
+function _rmets_cpd_get_workflow_status_id_by_name($name) {
+  foreach (workflow_get_workflow_names() as $workflow_id => $workflow_name) {
+    if (!is_null($state = workflow_state_load_by_name($name, $workflow_id))) {
+      return $state->sid;
+    }
+  }
+  return -1;
+}
+
+/**
+ * Returns if a given node has a given reviewer.
+ *
+ * Used to check access.
+ *
+ * @param $node
+ *
+ * @param $account
+ *  Defaults to the global user.
+ *
+ * @return boolean
+ */
+function _rmets_cpd_is_reviewer($node, $account = NULL) {
+  if (!$account) {
+    global $user;
+    $account = $user;
+  }
+
+  // If this is a cpd_record/ cpd_objective record and they are a reviewer than allow access.
+  $allow_access = FALSE;
+  if (in_array($node->type, array('cpd_objective', 'cpd_record'))) {
+    $owner = _rmets_cpd_get_cpd_node_owner($node);
+    if (user_access('view own cpd reviews') && $owner->uid == $account->uid) {
+      return TRUE;
+    }
+
+    $allow_access = TRUE;
+  }
+
+  $is_reviewer = FALSE;
+  // Get the relevant access permission for the relevant node type.
+  $access_function = '_rmets_' . $node->type . '_review_access_permission';
+  if (function_exists($access_function)) {
+    $access_permission = $access_function();
+    $is_reviewer = user_access($access_permission);
+  }
+
+  if (!$is_reviewer) {
+    return FALSE;
+  }
+
+  // If this is a cpd_record/ cpd_objective record and they are a reviewer than allow access.
+  if ($allow_access) {
+    return TRUE;
+  }
+
+  $node_wrapper = entity_metadata_wrapper('node', $node);
+  $reviewer_uids = array();
+
+  // TODO tidy, and support more than two reviews.
+  $review_1 = $node_wrapper->field_reviews[0]->value();
+  if ($review_1) {
+    $review_wrapper_1 = entity_metadata_wrapper('field_collection_item', $review_1);
+    $reviewer_1 = $review_wrapper_1->field_reviewer->value();
+    if (!empty($reviewer_1->uid)) {
+      $reviewer_uids[] = $reviewer_1->uid;
+    }
+  }
+
+  $review_2 = $node_wrapper->field_reviews[1]->value();
+  if ($review_2) {
+    $review_wrapper_2 = entity_metadata_wrapper('field_collection_item', $review_2);
+    $reviewer_2 = $review_wrapper_2->field_reviewer->value();
+    if (!empty($reviewer_2->uid)) {
+      $reviewer_uids[] = $reviewer_2->uid;
+    }
+  }
+
+  $is_review_reviewer = in_array($account->uid, $reviewer_uids);
+
+  if ($is_review_reviewer) {
+    return TRUE;
+  } else {
+    return FALSE;
+  }
+}
+
+/**
+ * Set various form fields to be removed from view.
+ *
+ * @param $form
+ */
+function _rmets_cpd_node_hide_fields(&$form) {
+  global $user;
+
+  // Allow the admin (uid:1) to be able to access the fields.
+  if ($user->uid == 1) {
+    return;
+  }
+
+  // Hide unneeded fields.
+  $form['title']['#access'] = FALSE;
+  $form['additional_settings']['#prefix'] = '<div style="display: none">';
+  $form['additional_settings']['#suffix'] = '</div>';
+  $form['xmlsitemap']['#access'] = FALSE;
+  $form['path']['#access'] = FALSE;
+  $form['comment_settings']['#access'] = FALSE;
+  //$form['print']['#access'] = FALSE;
+  $form['print']['#prefix'] = '<div style="display: none">';
+  $form['print']['#suffix'] = '</div>';
+  $form['revision_information']['#access'] = FALSE;
+  $form['author']['#access'] = FALSE;
+  $form['ds_extras']['#access'] = FALSE;
+  $form['options']['#access'] = FALSE;
+  $form['redirect']['#access'] = FALSE;
+  $form['field_awarded_accreditation']['#access'] = user_access('administer cpd section');
+  $form['field_next_cpd_submission_date']['#access'] = user_access('administer cpd section');
+  $form['field_notes']['#access'] = user_access('administer cpd section');
+  $form['actions']['preview_changes']['#access'] = FALSE;
+
+  // Set the node to always be published for the admin view.
+  $form['options']['status']['#default_value'] = NODE_PUBLISHED;
+}
+
+function _rmets_cpd_node_change_add_cpd_records_button_name(&$form) {
+  // Change the 'add another item' text.
+  $form['field_records'][LANGUAGE_NONE]['add_more']['#value'] = 'Select CPD records to be included';
+}
+
+/**
+ * Implements hook_entityreference_view_widget_label_alter().
+ */
+function rmets_cpd_entityreference_view_widget_label_alter(&$label, $entity, $element) {
+  if ($element == 'field_records') {
+    if (!isset($entity->field_areas_of_competency['und'])) {
+      return;
+    }
+    $terms = [];
+    foreach ($entity->field_areas_of_competency['und'] AS $value) {
+      $term = taxonomy_term_load($value['tid']);
+      $terms[] = check_plain($term->name);
+    }
+    if (!empty($terms)) {
+      $label .= ' <strong>(Core Competencies: ' . implode(', ', $terms) . ')</strong>';
+    }
+  }
+}
+
+/**
+ * Adds the 'apply' button to the form.
+ *
+ * Used by review & accreditation for setting the apply button on the form.
+ *
+ * @param array $form
+ *   The form array.
+ * @param boolean $is_node_add
+ *   Is the form in the 'add' state.
+ * @param boolean $is_admin
+ *   Does the user have 'admin' access to the form.
+ * @param string $apply_submit_function
+ *   The name of the submit function to be called by the apply button.
+ */
+function _rmets_cpd_node_add_apply_button(&$form, $is_node_add, $is_admin, $apply_submit_function) {
+  // Set the access on the admin fields.
+  $is_review_reviewer = _rmets_cpd_is_reviewer($form['#node']);
+  $form['field_reviews']['#access'] = $is_admin || $is_review_reviewer;
+  $form['field_status']['#access'] = $is_admin || $is_review_reviewer;
+  $form['field_admin_file_attachment']['#access'] = $is_admin || $is_review_reviewer;
+
+  // Add the 'Apply' button.  This saves the form, and updates the status to pending.
+  $node_wrapper = entity_metadata_wrapper('node', $form['#node']);
+  $state_draft = _rmets_cpd_get_workflow_status_id_by_name('Draft');
+  if ($node_wrapper->field_status->value() == $state_draft || $is_node_add) {
+    $form['apply'] = array(
+      '#type' => 'submit',
+      '#access' => TRUE,
+      '#value' => 'Submit',
+      '#weight' => 100,
+      '#submit' => array($apply_submit_function),
+      '#validate' => array('_rmets_cpd_node_form_validate', 'node_form_validate'),
+    );
+
+    $form['#groups']['group_submit']->children[] = 'apply';
+    $form['#fieldgroups']['group_submit']->children[] = 'apply';
+    $form['#group_children']['apply'] = 'group_submit';
+  }
+}
+
+/**
+ * Adds the required field asterix to fields on the form.
+ *
+ * Adds the required field asterix to fields that are required for the submission
+ * of CPD Report/ Applications.
+ *
+ * @param array $form
+ *   The form array.
+ */
+function _rmets_cpd_node_add_required_field_markers(&$form) {
+  $node = $form['#node'];
+  // get the fields for a node type.
+  $fields_info = field_info_instances('node', $node->type);
+  $required_text = ' <span class="form-required" title="This field is required.">*</span>';
+
+  foreach ($fields_info as $field_name => $value) {
+    // Check if the field has the review_settings setting on it.
+    if (!isset($value['settings']['rmets_cpd_reviews_settings'])) {
+      continue;
+    }
+    $field_required = $value['settings']['rmets_cpd_reviews_settings']['submit_app_required'];
+    if ($field_required) {
+      // Add the required asterix to the label.
+      switch ($value['widget']['type']) {
+        case 'text_textfield':
+        case 'text_crm_accreditation_item_options':
+          $form[$field_name][LANGUAGE_NONE][0]['value']['#title'] .= $required_text;
+          break;
+        case 'email_textfield':
+          $form[$field_name][LANGUAGE_NONE][0]['email']['#title'] .= $required_text;
+          break;
+        case 'text_textarea':
+          if (!isset($form[$field_name][LANGUAGE_NONE][0]['value'])) {
+            $form[$field_name][LANGUAGE_NONE][0]['#title'] .= $required_text;
+          }
+          else {
+            $form[$field_name][LANGUAGE_NONE][0]['value']['#title'] .= $required_text;
+          }
+          // Force the format to be 'member_html'.
+          $form[$field_name][LANGUAGE_NONE][0]['#format'] = 'member_html';
+          break;
+        case 'options_select':
+        case 'options_onoff':
+        case 'entityreference_view_widget':
+        case 'field_collection_embed':
+          $form[$field_name][LANGUAGE_NONE]['#title'] .= $required_text;
+          break;
+      }
+    }
+  }
+}
+
+/**
+ * Form validation handler for hook_form_alter() functions.
+ *
+ * @see rmets_cpd_reviews_form_cpd_report_review_node_form_alter().
+ * @see rmets_cpd_accreditation_form_cpd_accreditation_application_node_form_alter().
+ */
+function _rmets_cpd_node_form_validate($form, &$form_state) {
+  $form_children_keys = element_children($form);
+
+  foreach($form_children_keys as $form_children_key) {
+    _rmets_cpd_node_form_validate_field($form_children_key, $form_state['values'], $form['#bundle']);
+  }
+
+  if ($form['#bundle'] == 'cpd_accreditation_application' || $form['#bundle'] == 'cpd_report_review') {
+    _rmets_cpd_validate_competencies($form['#bundle'], $form_state['values']);
+  }
+
+  if ($form['#bundle'] == 'cpd_accreditation_application') {
+    _rmets_cpd_validate_specialisms($form['#bundle'], $form_state);
+    _rmets_cpd_validate_user_work_experience_education($form_state['values']);
+  }
+}
+
+/**
+ * Implements hook_form_alter().
+ */
+function rmets_cpd_form_views_exposed_form_alter(&$form, &$form_state, $form_id) {
+  $view = views_get_current_view();
+  if ($view->current_display == 'cpd_objective_page') {
+    $form['#prefix'] = '<h3>Filter your objectives</h3>';
+  }
+  if ($view->current_display == 'cpd_record_page') {
+    $form['#prefix'] = '<h3>Filter your records</h3>';
+  }
+  if ($view->current_display == 'cpd_report_page') {
+    $form['#prefix'] = '<h3>Filter your reports</h3>';
+  }
+}
+
+/**
+ * Form validation fo the fields that need to be validated.
+ *
+ * This checks if a field has been set to be validated for when the 'apply'
+ * button form submit happens.
+ *
+ * @see _rmets_cpd_node_form_validate().
+ */
+function _rmets_cpd_node_form_validate_field($field_name, $form_state_values, $node_type) {
+  $field_info_instance = field_info_instance('node', $field_name, $node_type);
+
+  // If the submit_app_required isn't set / isn't set to true return.
+  if (empty($field_info_instance['settings']['rmets_cpd_reviews_settings']['submit_app_required'])) {
+    return;
+  }
+  if ($field_info_instance['settings']['rmets_cpd_reviews_settings']['submit_app_required'] == 0) {
+    return;
+  }
+
+  // If no value has been submitted for the field, set the error message.
+  if (empty($form_state_values[$field_name])) {
+    form_set_error($field_name, t('!field_name is a required field.', array('!field_name' => $field_info_instance['label'])));
+  }
+
+  // Use the hook_field_is_empty() function to see if the other fields are empty.
+  $function = $field_info_instance['widget']['module'] . '_field_is_empty';
+  if (function_exists($function)) {
+    if ($function($form_state_values[$field_name][LANGUAGE_NONE][0], $field_info_instance['widget'])) {
+      form_set_error($field_name, t('!field_name is a required field.', array('!field_name' => $field_info_instance['label'])));
+    }
+  }
+
+  // Validate options (checkboxes/ radios).
+  if ($field_info_instance['widget']['module'] == 'options' && $field_info_instance['widget']['type'] == 'options_onoff') {
+    if (empty($form_state_values[$field_name][LANGUAGE_NONE][0]['value']) || $form_state_values[$field_name][LANGUAGE_NONE][0]['value'] == 0) {
+      form_set_error($field_name, t('!field_name is a required field.', array('!field_name' => $field_info_instance['label'])));
+    }
+  }
+
+  // Validate options (select) or the custom field_crm_accreditation_type.
+  if (($field_info_instance['widget']['module'] == 'options' && $field_info_instance['widget']['type'] == 'options_select') ||
+    ($field_info_instance['widget']['module'] == 'rmets_crm') && $field_info_instance['widget']['type'] == 'text_crm_accreditation_item_options') {
+    $value_key = _rmets_cpd_get_value_key_from_field($field_info_instance);
+    if (empty($form_state_values[$field_name][LANGUAGE_NONE][0][$value_key])) {
+      form_set_error($field_name, t('!field_name is a required field.', array('!field_name' => $field_info_instance['label'])));
+    }
+  }
+
+  // Validate options (entityreference_view_widget).
+  if ($field_info_instance['widget']['module'] == 'entityreference_view_widget') {
+    if (empty($form_state_values[$field_name][LANGUAGE_NONE][0]['target_id'])) {
+      if ($field_name == 'field_records') {
+        form_set_error($field_name, t('In order to continue you must supply a series of CPD records for review on the Records tab below.'));
+      }
+      else {
+        form_set_error($field_name, t('!field_name is a required field.', array('!field_name' => $field_info_instance['label'])));
+      }
+    }
+  }
+
+  // Commented out as RMets no longer required this validation.
+  // Validate options (work experience field_collection).
+  /*if ($field_info_instance['widget']['module'] == 'field_collection' && $field_info_instance['field_name'] == 'field_qualifying_work_experience') {
+    // Check that the first work experience record has been populated.
+    $first_work_experience = $form_state_values[$field_name][LANGUAGE_NONE][0];
+    if ($first_work_experience['field_employer_name'][LANGUAGE_NONE][0]['value'] == '') {
+      form_set_error($field_name, t('In order to continue you must supply your work experience details.'));
+    }
+    if ($first_work_experience['field_employer_address'][LANGUAGE_NONE][0]['value'] == '') {
+      form_set_error($field_name, t('In order to continue you must supply your work experience details.'));
+    }
+    if ($first_work_experience['field_job_title_position'][LANGUAGE_NONE][0]['value'] == '') {
+      form_set_error($field_name, t('In order to continue you must supply your work experience details.'));
+    }
+    if ($first_work_experience['field_start_date'][LANGUAGE_NONE][0]['value'] == '') {
+      form_set_error($field_name, t('In order to continue you must supply your work experience details.'));
+    }
+    if ($first_work_experience['field_nature_of_work'][LANGUAGE_NONE][0]['value'] == '') {
+      form_set_error($field_name, t('In order to continue you must supply your work experience details.'));
+    }
+
+    // Check that the total duration of the work is greater than 3 years.
+    $work_experience_total = 0;
+    foreach ($form_state_values[$field_name][LANGUAGE_NONE] as $work_experience) {
+      if (!is_array($work_experience)) {
+        continue;
+      }
+      $field_start_date = $work_experience['field_start_date'][LANGUAGE_NONE][0]['value'];
+      $field_end_date = $work_experience['field_end_date'][LANGUAGE_NONE][0]['value'];
+
+      // Blank end date must be that they are still working at that job so set to now.
+      $end_date = ($field_end_date == '' && $field_start_date != '') ? REQUEST_TIME : $field_end_date;
+      $date_diff = $end_date - $field_start_date;
+      $work_experience_total += $date_diff;
+    }
+    $work_experience_total_years = floor($work_experience_total / 60 / 60 / 24 / 365.25);
+
+    if ($work_experience_total_years < 3) {
+      form_set_error($field_name . '][und][0][field_start_date', t('In order to continue you must supply your work experience details for the past 3 years.'));
+      form_set_error($field_name . '][und][0][field_end_date', '');
+    }
+  }*/
+}
+
+function _rmets_cpd_validate_competencies($node_type, $form_state_values) {
+  $errors = [];
+  if ($node_type == 'cpd_report_review') {
+    $max = 3;
+    $min = 1;
+  }
+  else if ($node_type == 'cpd_accreditation_application') {
+    $min = 3;
+    $max = 0;
+  }
+
+  $competency_taxonomy_count = rmets_cpd_count_competencies_attached_to_node($form_state_values);
+
+  $error = rmets_cpd_get_competencies_over_limit_message($competency_taxonomy_count, $max);
+  if (!empty($error)) {
+    $errors[] = $error;
+  }
+
+  $error = rmets_cpd_get_competencies_under_limit_message($competency_taxonomy_count, $min);
+  if (!empty($error)) {
+    $errors[] = $error;
+  }
+
+  if (!empty($errors)) {
+    form_set_error(' ', implode('<br />', $errors));
+  }
+}
+
+/**
+ * Validate the areas of specialism.
+ *
+ * @param string $node_type - The node type
+ * @param array $form_state - The form state form form api
+ */
+function _rmets_cpd_validate_specialisms($node_type, $form_state) {
+  if (!empty($form_state['values']['field_crm_accreditation_type']['und'][0]['value'])) {
+    $type_key = ($form_state['values']['field_crm_accreditation_type']['und'][0]['value']);
+    $type = $form_state['complete form']['field_crm_accreditation_type']['und'][0]['value']['#options'][$type_key];
+  }
+  if (!empty($type)) {
+    $is_cmet = preg_match('/^cmet/', strtolower($type)) ? TRUE : FALSE;
+  }
+  $specialism_count = count($form_state['values']['field_areas_of_specialism']['und']);
+  if (isset($is_cmet) && $is_cmet === TRUE && $specialism_count > 5) {
+    form_set_error('field_areas_of_specialism', 'CMet applicants can have a maximum of 5 areas of specialism');
+  }
+  if (isset($is_cmet) && $is_cmet === FALSE && $specialism_count > 3) {
+    form_set_error('field_areas_of_specialism', 'RMet applicants can have a maximum of 3 areas of specialism');
+  }
+}
+
+/**
+ * Validate the work experience and education fields on the user profile.
+ *
+ * @param array $form_state_values
+ *   The form state values from form api.
+ */
+function _rmets_cpd_validate_user_work_experience_education($form_state_values) {
+  $uid = $form_state_values['uid'];
+  $account = user_load($uid);
+
+  $field_profile_qualifications = field_view_field('user', $account, 'field_qualifications');
+  if (count($field_profile_qualifications) < 1) {
+    drupal_set_message(t('In order to continue you must supply your qualification details.'), 'error');
+  }
+
+  $field_profile_work_experience = field_view_field('user', $account, 'field_qualifying_work_experience');
+  if (count($field_profile_work_experience['#items']) < 1) {
+    drupal_set_message(t('In order to continue you must supply your work experience details.'), 'error');
+  }
+  else {
+    // @see _rmets_cpd_node_form_validate_field();
+    // Todo refactor with _rmets_cpd_node_form_validate_field if reports uses separate fields.
+    // Check that the total duration of the work is greater than 3 years.
+    /*$work_experience_total = 0;
+    foreach ($field_profile_work_experience['#items'] as $work_experience) {
+//      if (!is_array($work_experience)) {
+//        continue;
+//      }
+      $field_collection_item = field_collection_item_load($work_experience['value']);
+
+      $field_start_date = $field_collection_item->field_start_date[LANGUAGE_NONE][0]['value'];
+      $field_end_date = $field_collection_item->field_end_date[LANGUAGE_NONE][0]['value'];
+
+      // Blank end date must be that they are still working at that job so set to now.
+      $end_date = ($field_end_date == '' && $field_start_date != '') ? REQUEST_TIME : $field_end_date;
+      $date_diff = $end_date - $field_start_date;
+      $work_experience_total += $date_diff;
+    }
+    $work_experience_total_years = floor($work_experience_total / 60 / 60 / 24 / 365.25);
+
+    if ($work_experience_total_years < 3) {
+      form_set_error('', t('In order to continue you must supply your work experience details for the past 3 years.'));
+    }*/
+  }
+}
+
+/**
+ * Given an array of competency tids and their counts
+ * find any competencies where the count is less than the
+ * minimum.
+ *
+ * @param $competency_taxonomy_count
+ * @param $min
+ * @return array
+ */
+function rmets_cpd_get_competencies_under_limit($competency_taxonomy_count, $min) {
+  // Find out if there are taxonomy terms missing.
+  $voc = taxonomy_vocabulary_machine_name_load('areas_of_competency');
+  $terms = entity_load('taxonomy_term', FALSE, array('vid' => $voc->vid));
+  $too_few = array_diff_key($terms, $competency_taxonomy_count);
+
+  foreach ($competency_taxonomy_count AS $tid => $count) {
+    if ($count < $min) {
+      $too_few[] = taxonomy_term_load($tid);
+    }
+  }
+  return $too_few;
+}
+
+/**
+ * Generate the message for when a user has submitted too few competency examples.
+ *
+ * @param $competency_taxonomy_count
+ * @param $min
+ *
+ * @return string the error string.
+ */
+function rmets_cpd_get_competencies_under_limit_message($competency_taxonomy_count, $min) {
+  $error = '';
+  if ($min > 0) {
+    $too_few = rmets_cpd_get_competencies_under_limit($competency_taxonomy_count, $min);
+
+    if (!empty($too_few)) {
+      $missing_names = [];
+      foreach ($too_few AS $tid => $term) {
+        $missing_names[] = $term->name;
+      }
+      $error =
+        t('
+        You need to provide at least %min for each core competency.
+        The following core competencies @how_many_missing attached to this report: %list',
+          [
+            '%list' => implode(', ', $missing_names),
+            '%min' => $min . ' ' . format_plural($min, 'CPD record', 'CPD records'),
+            '@how_many_missing' => ($min == 1) ? 'do not have a CPD record' : 'have less than ' . check_plain($min) . ' CPD records',
+          ]
+        );
+    }
+  }
+  return $error;
+}
+
+/**
+ * Generate the message for when a user has submitted too many competency examples.
+ *
+ * @param $competency_taxonomy_count
+ * @param $max
+ *
+ * @return string the error string.
+ */
+function rmets_cpd_get_competencies_over_limit_message($competency_taxonomy_count, $max) {
+  $error = '';
+  if ($max > 0) {
+    $too_many = rmets_cpd_get_competencies_over_limit($competency_taxonomy_count, $max);
+
+    if (!empty($too_many)) {
+      $error =
+        t('
+          You can only provide a maximum of %max for each core competency.
+          The following core competency has too many CPD records relating to it: %list',
+          [
+            '%list' => implode(', ', $too_many),
+            '%max' => $max . ' ' . format_plural($max, 'CPD record', 'CPD records'),
+          ]
+        );
+    }
+  }
+  return $error;
+}
+
+/**
+ * Given an array of competency tids and their counts
+ * find any competencies where the count is greater than the
+ * maximum.
+ *
+ * @param $competency_taxonomy_count
+ * @param $min
+ * @return array
+ */
+function rmets_cpd_get_competencies_over_limit($competency_taxonomy_count, $max) {
+  $too_many = [];
+  foreach ($competency_taxonomy_count AS $tid => $count) {
+    if ($count > $max) {
+      $too_many[] = taxonomy_term_load($tid)->name;
+    }
+  }
+  return $too_many;
+}
+
+/**
+ * Get all competencies from reports attached to a node.
+ *
+ * @param array $form_state_values
+ * @return array
+ */
+function rmets_cpd_count_competencies_attached_to_node($form_state_values) {
+  $competency_taxonomy_count = [];
+  foreach ($form_state_values['field_records'][LANGUAGE_NONE] AS $id => $values) {
+    if (!isset($values['target_id'])) {
+      continue;
+    }
+    $record_node = node_load($values['target_id']);
+    if (!empty($record_node->field_areas_of_competency[LANGUAGE_NONE])) {
+      $competencies = array_column($record_node->field_areas_of_competency[LANGUAGE_NONE], 'tid');
+      foreach ($competencies AS $competency) {
+        $competency_taxonomy_count[$competency] = isset($competency_taxonomy_count[$competency]) ? $competency_taxonomy_count[$competency] + 1 : 1;
+      }
+    }
+  }
+  return $competency_taxonomy_count;
+}
+
+/**
+ * Given a field instance, get the value key
+ */
+function _rmets_cpd_get_value_key_from_field($field_instance) {
+  $type = $field_instance['display']['default']['module'];
+
+  if ($type == 'entityreference') {
+    return 'target_id';
+  }
+
+  if ($type == 'taxonomy') {
+    return 'tid';
+  }
+
+  return 'value';
+}
+
+/**
+ * This saves additional information about the submit review required fields.
+ *
+ * @see rmets_cpd_reviews_form_field_ui_field_edit_form_alter().
+ * @see rmets_cpd_accreditation_form_field_ui_field_edit_form_alter().
+ */
+function _rmets_cpd_form_field_ui_field_edit_form_alter(&$form, &$form_state, $form_id, $node_type) {
+  if ($form['#instance']['entity_type'] != 'node' || $form['#instance']['bundle'] != $node_type) {
+    return;
+  }
+
+  $form['instance']['settings']['rmets_cpd_reviews_settings'] = array(
+    '#type' => 'fieldset',
+    '#title' => 'RMetS review settings.',
+  );
+
+  $form['instance']['settings']['rmets_cpd_reviews_settings']['submit_app_required'] = array(
+    '#type' => 'checkbox',
+    '#title' => 'Required, when the application or review is submitted',
+    '#default_value' => isset($form['#instance']['settings']['rmets_cpd_reviews_settings']['submit_app_required']) && $form['#instance']['settings']['rmets_cpd_reviews_settings']['submit_app_required'] == 1,
+  );
+}
+
+/**
+ * Updates the group tab descriptions from variable values.
+ *
+ * @param $form
+ */
+function _rmets_cpd_node_group_descriptions(&$form) {
+  $field_groups = field_group_info_groups('node', $form['#bundle']);
+  foreach ($field_groups['form'] as $key => $group) {
+    $key = md5('rmets_' . $form['#bundle'] . '_' . $key);
+    $group_desc = variable_get('rmets_' . $key);
+    if (!empty($group_desc)) {
+      $group->format_settings['instance_settings']['description'] = $group_desc;
+    }
+  }
+}
+
+/**
+ * The description for field_status is hidden by workflow for reasons unknown.
+ *
+ * This not only puts it back but adds some helpful extra information.
+ */
+function _rmets_cpd_node_add_field_status_description(&$form) {
+  if (isset($form['field_status']) && user_access('administer cpd section')) {
+    $current_status = workflow_get_sid_label($form['field_status'][LANGUAGE_NONE][0]['#default_value']);
+    $form['field_status']['status_help'] = array(
+      '#markup' => '<p>' . $form['field_status'][LANGUAGE_NONE]['#description'] . '</p>' .
+                   '<p>' . t('Current status is #status', array('#status' => $current_status)) . '</p>',
+      '#weight' => $form['field_status']['#weight'],
+    );
+  }
+}
+
+/**********************************************************
+ *
+ * End - Review / Accreditation node edit/ validation functions.
+ *
+ **********************************************************/
+
+/**********************************************************
+ *
+ * Review / Accreditation review block functions.
+ *
+ **********************************************************/
+
+/**
+ * Implements hook_block_info().
+ */
+function rmets_cpd_block_info() {
+  $blocks = array();
+
+  $blocks['rmets_cpd__review_form'] = array(
+    'info' => t('RMetS CPD Reviews - Review Form'),
+    'cache' => DRUPAL_NO_CACHE,
+  );
+
+  return $blocks;
+}
+
+/**
+ * Implements hook_block_view().
+ */
+function rmets_cpd_block_view($delta) {
+  $function = __FUNCTION__ . '__' . $delta;
+  if (function_exists($function)) {
+    return $function();
+  }
+}
+
+/**
+ * Callback for hook_block_view().
+ *
+ * @see rmets_cpd_reviews_block_view().
+ */
+function rmets_cpd_block_view__rmets_cpd__review_form() {
+  global $user;
+
+  $block = array();
+  $block['subject'] = t('Your Review');
+
+  $menu_item = menu_get_item();
+  $cpd_review_paths = array(
+    'node/%',
+    'cpd/review/report/%',
+    'cpd/review/application/%',
+  );
+  if (!in_array($menu_item['path'], $cpd_review_paths)) {
+    return;
+  }
+
+  $node = $menu_item['page_arguments'][0];
+
+  // Only try to load the form if they are a reviewer.
+  if (!_rmets_cpd_is_reviewer($node, $user)) {
+    return;
+  }
+
+  // If this is a cpd_record/ cpd_objective record and they are a reviewer than allow access.
+  if (in_array($node->type, array('cpd_objective', 'cpd_record'))) {
+    return;
+  }
+
+  // Get the viewed node's review's ids.
+  $node_review_ids = array();
+  foreach($node->field_reviews[LANGUAGE_NONE] as $review) {
+    $node_review_ids[] = $review['value'];
+  }
+
+  // Get the review for the current node / user.
+  $query = new EntityFieldQuery();
+  $entities = $query->entityCondition('entity_type', 'field_collection_item')
+    ->propertyCondition('item_id', $node_review_ids, 'IN')
+    ->propertyCondition('field_name', 'field_reviews')
+    ->fieldCondition('field_reviewer', 'target_id', $user->uid)
+    ->execute();
+
+  // The the logged in user isn't an assigned review on this node return.
+  if (empty($entities['field_collection_item'])) {
+    return;
+  }
+
+  // Get the field collection form.
+  module_load_include('inc', 'field_collection', 'field_collection.pages');
+  $review_id = array_pop(array_keys($entities['field_collection_item']));
+  $review = field_collection_item_load($review_id);
+  $review_wrapper = entity_metadata_wrapper('field_collection_item', $review_id);
+  $review_text = $review_wrapper->field_review->value();
+
+  // @TODO remove magic number.
+  $state_awaiting_review = _rmets_cpd_get_workflow_status_id_by_name('Awaiting review');
+  if ($node->field_status[LANGUAGE_NONE][0]['value'] != $state_awaiting_review) {
+    // The application is not in the Awaiting review state.
+    if (strlen(trim($review_text['value'])) < 1) {
+      // This user has not reviewed the application.
+      drupal_set_message(t('You cannot currently review this application'));
+      return;
+    }
+
+    drupal_set_message(t('You have reviewed this application'));
+    $block['content'] = $review_text['safe_value'];
+  }
+  else {
+    if (isset($review->field_review_status[LANGUAGE_NONE]) && $review_wrapper->field_review_status->value() != 'pending') {
+      // Once they have changed the status to reviewed... they can't edit it again.
+      drupal_set_message(t('You have reviewed this application'));
+      $block['content'] = empty($review_text['safe_value']) ? $review_text['value'] : $review_text['safe_value'];
+    }
+    else {
+      $block['content'] = drupal_get_form('field_collection_item_form', $review);
+    }
+  }
+
+  return $block;
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function rmets_cpd_form_field_collection_item_form_alter(&$form, &$form_state) {
+  $menu_item = menu_get_item();
+  $cpd_review_paths = array(
+    'node/%',
+    'cpd/review/report/%',
+    'cpd/review/application/%',
+  );
+  if (in_array($menu_item['path'], $cpd_review_paths)) {
+    $form['#submit'][] = '_rmets_cpd_field_collection_item_form_submit';
+    $is_admin = user_access('view edit other users cpd accreditation applications');
+    $form['field_reviewer']['#access'] = $is_admin;
+  }
+}
+
+/**
+ * Field collection item form submit handler.
+ *
+ * @see rmets_cpd_form_field_collection_item_form_alter().
+ */
+function _rmets_cpd_field_collection_item_form_submit($form, &$form_state) {
+  // Redirect the form back to the node being reviewed.
+  $form_state['redirect'] = current_path();
+
+  if (!empty($form_state['input']['field_review_status'][LANGUAGE_NONE]) && $form_state['input']['field_review_status'][LANGUAGE_NONE] != 'pending') {
+    $updated_review_id = $form_state['build_info']['args'][0]->item_id;
+    $node = node_load(arg(3));
+
+    $all_review_complete = TRUE;
+    foreach($node->field_reviews[LANGUAGE_NONE] as $review_id) {
+      if ($updated_review_id == $review_id['value']) {
+        continue;
+      }
+      $review = field_collection_item_load($review_id['value']);
+      // No reviewer set, so skip.
+      if (!isset($review->field_reviewer[LANGUAGE_NONE])) {
+        continue;
+      }
+      if (!isset($review->field_review_status[LANGUAGE_NONE]) || $review->field_review_status[LANGUAGE_NONE][0]['value'] == 'pending') {
+        $all_review_complete = FALSE;
+        break;
+      }
+    }
+
+    if ($all_review_complete) {
+      global $user;
+      $state_awaiting_review = _rmets_cpd_get_workflow_status_id_by_name('Awaiting review');
+      $state_review_processing = _rmets_cpd_get_workflow_status_id_by_name('Review processing');
+      $transition = new WorkflowTransition();
+      $transition->setValues('node', $node, 'field_status', $state_awaiting_review, $state_review_processing, $user->uid, REQUEST_TIME, t('All Reviews complete.'));
+      workflow_execute_transition('node', $node, 'field_status', $transition, TRUE);
+    }
+  }
+}
+
+/**
+ * Implements hook_field_formatter_info().
+ */
+function rmets_cpd_field_formatter_info() {
+  return array(
+    'rmets_cpd_node_status_formatter' => array(
+      'label' => t('CPD Status Formatter'),
+      'field types' => array('workflow'),
+    ),
+
+    'rmets_cpd_embedded_records_formatter' => array(
+      'label' => t('Embedded CPD Records'),
+      'field types' => array('entityreference'),
+      'settings' => array(
+        'link_title' => TRUE,
+      ),
+    ),
+    'rmets_cpd_accreditation_application_type_formatter' => array(
+      'label' => t('CPD Accreditation Application Type'),
+      'field types' => array('text'),
+    ),
+  );
+}
+
+/**
+ * Callback for field formatter of accreditation type view.
+ */
+function rmets_cpd_accreditation_application_type_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display) {
+  $element = array();
+
+  $node_wrapper = entity_metadata_wrapper('node', $entity);
+  $account = $node_wrapper->field_user->value();
+  if (empty($account)) {
+    return $element;
+  }
+
+  $account_wrapper = new UserWrapper($account);
+  $accreditation_item_id = $node_wrapper->field_crm_accreditation_type->value();
+  if (!empty($accreditation_item_id)) {
+    // Cache the API data for this users accreditation.
+    $cache_accreditation_type_element_key = __FUNCTION__ . '_' . $account_wrapper->getIdentifier() . '_' . $accreditation_item_id;
+
+    if ($cache = cache_get($cache_accreditation_type_element_key)) {
+      $accreditation_type_element = $cache->data;
+    }
+    else {
+      /** @var AccreditationItem $accreditation_item */
+      $accreditation_item = $account_wrapper->getAccreditationApplicationDetails($accreditation_item_id);
+      if (!empty($accreditation_item)) {
+        $accreditation_type_element = $accreditation_item->getName();
+        // Cache this data for 6 hours.
+        cache_set($cache_accreditation_type_element_key, $accreditation_type_element, 'cache', REQUEST_TIME + (60 * 60 * 6));
+      }
+    }
+
+    if (isset($accreditation_type_element)) {
+      $element[0]['#markup'] = $accreditation_type_element;
+    }
+  }
+
+  return $element;
+}
+
+/**
+ * Implements hook_field_formatter_settings_form().
+ */
+function rmets_cpd_field_formatter_settings_form($field, $instance, $view_mode, $form, &$form_state) {
+  //This gets the view_mode where our settings are stored
+  $display = $instance['display'][$view_mode];
+  //This gets the actual settings
+  $settings = $display['settings'];
+  //Initialize the element variable
+  $element = array();
+  //Add the link checkbox
+  $element['link_title'] = array(
+    '#type'           => 'checkbox',
+    '#title'          => t('Link Title'),
+    '#description'    => t('Does the title link to the CPD record'),
+    '#default_value'  => $settings['link_title'],
+  );
+  return $element;
+}
+
+/**
+ * Implements hook_field_formatter_settings_summary().
+ */
+function rmets_cpd_field_formatter_settings_summary($field, $instance, $view_mode) {
+  $display = $instance['display'][$view_mode];
+  $settings = $display['settings'];
+  $summary = t('Link: @link_title', array(
+    '@link_title' => isset($settings['link_title']) ? 'Yes' : 'No',
+  ));
+  return $summary;
+}
+
+/**
+ * Implements hook_field_formatter_view().
+ */
+function rmets_cpd_field_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display) {
+  $element = array();
+
+  $function = $display['type'] . '_view';
+
+  if (function_exists($function)) {
+    $element = call_user_func_array($function, func_get_args());
+  }
+
+  return $element;
+}
+
+/**
+ * Render a browsable view of the CPD records.
+ */
+function rmets_cpd_embedded_records_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display) {
+  $element = array();
+  $link_title = $display['settings']['link_title'];
+  $view_display_id = $link_title ? 'embedded' : 'embedded_print';
+  $element[0]['#markup'] = views_embed_view('cpd_records_embedded', $view_display_id, $entity->nid);
+  return $element;
+}
+
+/**
+ *
+ */
+function rmets_cpd_node_status_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display) {
+  $element = array();
+
+  // Get the relevant workflow state names.
+  $workflow_type = workflow_get_workflow_state_names($instance['widget']['settings']['name_as_title']);
+
+  $draft = _rmets_cpd_get_workflow_status_id_by_name('Draft');
+  $awaiting_payment = _rmets_cpd_get_workflow_status_id_by_name('Awaiting payment');
+  $pending = _rmets_cpd_get_workflow_status_id_by_name('Pending');
+  $assigning_reviewers = _rmets_cpd_get_workflow_status_id_by_name('Assigning reviewers');
+  $awaiting_review = _rmets_cpd_get_workflow_status_id_by_name('Awaiting review');
+  $review_processing = _rmets_cpd_get_workflow_status_id_by_name('Review processing');
+  $awaiting_board_review = _rmets_cpd_get_workflow_status_id_by_name('Awaiting board review');
+  $awaiting_board_decision = _rmets_cpd_get_workflow_status_id_by_name('Awaiting board decision');
+  $unacceptable = _rmets_cpd_get_workflow_status_id_by_name('Unacceptable');
+  $acceptable = _rmets_cpd_get_workflow_status_id_by_name('Acceptable');
+
+  // Build the mapping for the user display text.
+  $user_mapping = array();
+  $user_mapping[$draft] = 'Draft';
+  $user_mapping[$awaiting_payment] = 'Awaiting payment';
+  $user_mapping[$pending] = 'Pending';
+  $user_mapping[$assigning_reviewers] = 'Assigning reviewers';
+  $user_mapping[$awaiting_review] = 'Awaiting review';
+  $user_mapping[$review_processing] = 'Review processing';
+  $user_mapping[$awaiting_board_review] = 'Awaiting board review';
+  $user_mapping[$awaiting_board_decision] = 'Awaiting board decision';
+  $user_mapping[$unacceptable] = 'Review complete';
+  $user_mapping[$acceptable] = 'Review complete';
+
+  $user_display = isset($user_mapping[$items[0]['value']]) ?
+    $user_mapping[$items[0]['value']] :
+    $workflow_type[$items[0]['value']];
+
+  $element[0]['#markup'] = $user_display;
+
+  return $element;
+}
+
+/**
+ * Get the list of CPD node types.
+ */
+function _rmets_cpd_node_types() {
+  return array(
+    'cpd_accreditation_application',
+    'cpd_report_review',
+    'cpd_objective',
+    'cpd_record',
+  );
+}
+
+/**
+ * Implements hook_node_access().
+ */
+function rmets_cpd_node_access($node, $op, $account) {
+  if (is_string($node) && !in_array($node, _rmets_cpd_node_types())) {
+    return NODE_ACCESS_IGNORE;
+  }
+
+  if (is_object($node) && !in_array($node->type, _rmets_cpd_node_types())) {
+    return NODE_ACCESS_IGNORE;
+  }
+
+  if (user_access('administer cpd section')) {
+    return NODE_ACCESS_ALLOW;
+  }
+
+  $function = __FUNCTION__ . '__' . $op;
+  if (function_exists($function)) {
+    return $function($node, $op, $account);
+  }
+
+  return NODE_ACCESS_IGNORE;
+}
+
+/**
+ * Implements hook_node_access().
+ *
+ * @see rmets_cpd_node_access();
+ */
+function rmets_cpd_node_access__create($node, $op, $account) {
+  if (user_access('view own cpd reviews')) {
+    return NODE_ACCESS_ALLOW;
+  }
+
+  return NODE_ACCESS_DENY;
+}
+
+/**
+ * Implements hook_node_access().
+ *
+ * @see rmets_cpd_node_access();
+ */
+function rmets_cpd_node_access__update($node, $op, $account) {
+
+  if (user_access('view edit other users cpd reviews')) {
+    return NODE_ACCESS_ALLOW;
+  }
+
+  $node_wrapper = entity_metadata_wrapper('node', $node);
+  $owner = _rmets_cpd_get_cpd_node_owner($node);
+
+  if (user_access('view own cpd reviews') && $owner->uid == $account->uid) {
+    if (!isset($node->field_status)) {
+      // If this is a non-workflow type, allow users to always edit
+      // their own CPD.
+      return NODE_ACCESS_ALLOW;
+    }
+
+    $state_draft = _rmets_cpd_get_workflow_status_id_by_name('Draft');
+    if ($node_wrapper->field_status->value() == $state_draft) {
+      // CPD owner can only edit their own CPD if it is in draft.
+      return NODE_ACCESS_ALLOW;
+    }
+  }
+
+  if (_rmets_cpd_is_reviewer($node)) {
+    return NODE_ACCESS_DENY;
+  }
+
+  return NODE_ACCESS_DENY;
+}
+
+/**
+ * Implements hook_node_access().
+ *
+ * @see rmets_cpd_node_access();
+ */
+function rmets_cpd_node_access__view($node, $op, $account) {
+  if (user_access('view edit other users cpd reviews')) {
+    return NODE_ACCESS_ALLOW;
+  }
+
+  $owner = _rmets_cpd_get_cpd_node_owner($node);
+  if (user_access('view own cpd reviews') && $owner->uid == $account->uid) {
+    return NODE_ACCESS_ALLOW;
+  }
+
+  if (_rmets_cpd_is_reviewer($node)) {
+    return NODE_ACCESS_ALLOW;
+  }
+
+  return NODE_ACCESS_DENY;
+}
+
+/**
+ * Get the owner of a CPD node.
+ *
+ * This is determined by either field_user if it is available
+ * otherwise it is the node's author.
+ *
+ * @param Node $node
+ *   The CPD node to check.
+ *
+ * @return User
+ *   The user account who owns the node.
+ */
+function _rmets_cpd_get_cpd_node_owner($node) {
+  if (isset($node->field_user)) {
+    return entity_metadata_wrapper('node', $node)->field_user->value();
+  }
+
+  return user_load($node->uid);
+}
+
+/**
+ * Implements hook_help().
+ */
+function rmets_cpd_help($path, $arg) {
+    switch ($path) {
+    case 'admin/help#rmets_cpd':
+      return "
+        <h3>Workflow statuses</h3>
+        <table>
+          <tr>
+            <th>Status</th>
+            <th>Description</th>
+            <th>Automatic Email sent?</th>
+          </tr>
+          <tr>
+            <td>Draft</td>
+            <td>The member has created an application or review and is still editing it.</td>
+            <td>No</td>
+          </tr>
+          <tr>
+            <td>Awaiting payment</td>
+            <td>The member has submitted an application and needs to pay for it</td>
+            <td>No</td>
+          </tr>
+          <tr>
+            <td>Pending</td>
+            <td>The member has submitted their application (and paid) or review. It is now awaiting processing from RMetS administrators.</td>
+            <td>Yes. 1 email is sent to RMetS administrators accreditation@rmets.org. 1 email is sent to the member informing them that the application or report was received.</td>
+          </tr>
+          <tr>
+            <td>Assigning reviewers</td>
+            <td>RMetS administrator has recived the appication and is processing it. Reviewers need to be assigned.</td>
+            <td>No</td>
+          </tr>
+          <tr>
+            <td>Awaiting review</td>
+            <td>Reviewers need to review the application or review.</td>
+            <td>Yes, if the previous status was <strong>Assigning Reviewers</strong>. An email is sent to each reviewer with a link to the application or report they need to review.</td>
+          </tr>
+          <tr>
+            <td>Review processing</td>
+            <td>All reviewers have completed their reviews, application or report i sback with RMetS administrator for processing.</td>
+            <td>Yes if the previous status was <strong>Awaiting review</strong>. An email is sent to accreditation@rmets.org informing them of completed reviews.</td>
+          </tr>
+          <tr>
+            <td>Awaiting board review</td>
+            <td>Application is awaiting board review.</td>
+            <td>No</td>
+          </tr>
+          <tr>
+            <td>Awaiting board decision</td>
+            <td>Application is awaiting board decision</td>
+            <td>No</td>
+          </tr>
+          <tr>
+            <td>Unacceptable</td>
+            <td>Application or Report was found unacceptable.</td>
+            <td>No</td>
+          </tr>
+          <tr>
+            <td>Acceptable</td>
+            <td>Application or Report was found acceptable and approved.</td>
+            <td>Yes if the previous status was <strong>Awaiting board decision</strong>. An email is sent to the member informing them of success.</td>
+          </tr>
+        </table>
+        ";
+  }
+}

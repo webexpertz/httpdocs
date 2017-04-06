@@ -1,0 +1,316 @@
+<?php
+/**
+ * Implements hook_form_node_type_form_alter().
+ */
+function schedule_review_form_node_type_form_alter(&$form, $form_state) {
+  $form['schedule_review'] = array(
+    '#type' => 'fieldset',
+    '#title' => 'Schedule review settings',
+    '#weight' => 35,
+    '#group' => 'additional_settings',
+    '#attached' => array(
+      'js' => array(
+        'vertical-tabs' => drupal_get_path('module', 'schedule_review') . "/schedule_review_vertical_tabs.js"
+      ),
+    ),
+  );
+  $form['schedule_review']['sr'] = array(
+      '#type' => 'fieldset',
+      '#title' => NULL,
+      '#collapsible' => FALSE,
+      '#collapsed' => FALSE,
+      '#weight' => 1,
+      '#group' => 'schedule_review',
+  );
+
+  $form['schedule_review']['sr']['schedule_review_enable'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Enable Schedule Review'),
+      '#default_value' => variable_get('schedule_review_enable_' . $form['#node_type']->type, 0),
+      '#description' => t('Check this box to enable scheduled review for this node type.')
+  );
+}
+
+/**
+ * Implementation of hook_form_alter().
+ */
+function schedule_review_form_alter(&$form, $form_state) {
+  // Is this a node form and scheduling has been enabled for this node type
+  if (!empty($form['#node_edit_form']) && user_access('schedule (un)publishing of nodes')) {
+    $sr_enabled = variable_get('schedule_review_enable_' . $form['type']['#value'], 0) == 1;
+
+    // if scheduling has been enabled for this node type
+    if ($sr_enabled) {
+
+      $node = $form['#node'];
+
+      $date_format = variable_get('scheduler_date_format', SCHEDULER_DATE_FORMAT);
+      $use_date_popup = _scheduler_use_date_popup();
+
+      $internal_date_format = $use_date_popup ? SCHEDULER_DATE_FORMAT : $date_format;
+
+      // if this is a preview then get the values from the form, not the db
+      if (isset($form_state['values']['op']) && $form_state['values']['op'] == t('Preview')) {
+        $defaults = new stdClass;
+        $defaults->review_on = $publishing_enabled ? $form_state['values']['review_on'] : NULL;
+      }
+      elseif (isset($node->nid) && $node->nid > 0) {
+        // Load the values from the db if we are viewing an existing node.
+        $query = db_select('schedule_review', 's');
+        $query->fields('s', array('review_on', 'review_email'));
+        $query->condition('s.nid', $node->nid, '=');
+        $defaults = $query->execute()->fetchObject();
+      }
+      else {
+        // init standard values
+        $defaults = new stdClass;
+        $defaults->review_on = NULL;
+      }
+
+      // if there is a text value then convert it to a unix timestamp
+      if (isset($defaults->review_on) && $defaults->review_on && !is_numeric($defaults->review_on)) {
+        $defaults->review_on = _scheduler_strtotime($defaults->review_on);
+      }
+
+      $sr_required = variable_get('schedule_review_required_' . $form['type']['#value'], 0) == 1;
+      $unpublishing_required = variable_get('scheduler_unpublish_required_' . $form['type']['#value'], 0) == 1;
+
+      $fieldset_extended = (
+        (isset($defaults->review_on) && $defaults->review_on != 0)
+        || $sr_required
+        || $unpublishing_required
+      );
+
+      $form['schedule_review_settings'] = array(
+        '#type' => 'fieldset',
+        '#title' => t('Schedule review'),
+        '#collapsible' => TRUE,
+        '#collapsed' => !$fieldset_extended,
+        '#weight' => 35,
+        '#group' => 'additional_settings',
+        '#attached' => array(
+          'js' => array(
+            'vertical-tabs' => drupal_get_path('module', 'schedule_review') . "/schedule_review_vertical_tabs.js"
+          ),
+        )
+      );
+
+      $extra_info = variable_get('scheduler_extra_info', '');
+      if ($extra_info && $extra_info != '') {
+        $form['scheduler_settings']['extra_info'] = array(
+          '#type' => 'item',
+          '#markup' => $extra_info,
+        );
+      }
+
+      $description_format = t('Format: %time.', array('%time' => format_date(time(), 'custom', $date_format)));
+      if ($sr_enabled) {
+        $description_blank = '';
+        if (!$sr_required) {
+          $description_blank .= ' ' . t('Leave blank to disable scheduled review.');
+        }
+
+        $form['schedule_review_settings']['review_on'] = array(
+          '#type' => 'textfield',
+          '#title' => t('Review on'),
+          '#maxlength' => 25,
+          '#required' => $sr_required,
+          '#default_value' => isset($defaults->review_on) && $defaults->review_on ? format_date($defaults->review_on, 'custom', $internal_date_format) : '',
+          '#description' => filter_xss($description_format . $description_blank),
+        );
+
+        $form['schedule_review_settings']['review_email'] = array(
+          '#type' => 'textfield',
+          '#title' => t('Email address to alert'),
+          '#maxlength' => 25,
+          '#required' => $sr_required,
+          '#default_value' => isset($defaults->review_email) && $defaults->review_email ? $defaults->review_email: '',
+          '#description' => filter_xss('The email address to notify'),
+        );
+      }
+
+      if ($use_date_popup) {
+        // Make this a popup calendar widget if Date Popup module is enabled.
+        if ($sr_enabled) {
+          $form['schedule_review_settings']['review_on']['#type'] = 'date_popup';
+          $form['schedule_review_settings']['review_on']['#date_format'] = $date_format;
+          $form['schedule_review_settings']['review_on']['#date_year_range'] = '0:+10';
+          if (!$sr_required) $form['schedule_reviewr_settings']['review_on']['#description'] = t('Leave blank to disable scheduled review.');
+          unset($form['schedule_review_settings']['review_on']['#maxlength']);
+        }
+      }
+    }
+  }
+}
+
+
+/**
+ * Implements hook_node_load().
+ */
+function schedule_review_node_load($nodes, $types) {
+  $nids = array_keys($nodes);
+  $result = db_query('SELECT * FROM {schedule_review} WHERE nid IN (:nids)', array(':nids' => $nids));
+  foreach ($result as $record) {
+    $nid = $record->nid;
+    $nodes[$nid]->review_on = $record->review_on;
+    $nodes[$nid]->review_email = $record->review_email;
+    /*
+    @TODO this
+    $row = array();
+    $row['published'] = $record->publish_on ? date(variable_get('date_format_long', 'l, F j, Y - H:i'), $record->publish_on) : NULL;
+    $row['unpublished'] = $record->unpublish_on ? date(variable_get('date_format_long', 'l, F j, Y - H:i'), $record->unpublish_on) : NULL;
+    $row['publish_on'] = $record->publish_on;
+    $row['unpublish_on'] = $record->unpublish_on;
+    $nodes[$nid]->scheduler = $row;
+    */
+  }
+}
+
+function schedule_review_node_validate($node, $form) {
+  // adjust the entered times for timezone consideration.
+  // Note, we must check to see if the value is numeric,
+  // if it is, assume we have already done the strtotime
+  // conversion. This prevents us running strtotime on
+  // a value we have already converted. This is needed
+  // because DRUPAL6 removed 'submit' and added 'presave'
+  // and all this happens at different times.
+
+  $date_format = variable_get('scheduler_date_format', SCHEDULER_DATE_FORMAT);
+
+  if (!empty($node->review_on) && !is_numeric($node->review_on)) {
+    $publishtime = _scheduler_strtotime($node->review_on);
+    if ($publishtime === FALSE) {
+      form_set_error('review_on', t("The 'review on' value does not match the expected format of %time", array('%time' => format_date(REQUEST_TIME, 'custom', $date_format))));
+    }
+    elseif ($publishtime && $publishtime < REQUEST_TIME) {
+      form_set_error('review_on', t("The 'review on' date must be in the future"));
+    }
+  }
+  if (!empty($node->review_email) && !valid_email_address($node->review_email)) {
+    form_set_error('review_email', 'email address not recognized');
+  }
+
+}
+
+function schedule_review_node_presave($node) {
+  foreach (array('review_on') as $key) {
+    if (empty($node->$key)) {
+    // Make sure review_on and unreview_on are not empty strings.
+      $node->$key = 0;
+    }
+    elseif (!is_numeric($node->$key)) {
+      $node->$key= _scheduler_strtotime($node->$key);
+    }
+  }
+  // Right before we save the node, we need to check if a "publish on" value has been set.
+  // If it has been set, we want to make sure the node is unpublished since it will be published at a later date
+  /* @TODO This
+  if (isset($node->review_on) && $node->review_on != '' && is_numeric($node->review_on) && $node->review_on > REQUEST_TIME) {
+    $node->status = 0;
+    $date_format = variable_get('scheduler_date_format', SCHEDULER_DATE_FORMAT);
+    drupal_set_message(t('This post is unpublished and will be published @publish_time.', array('@publish_time' => format_date($node->review_on, 'custom', $date_format))), 'status', FALSE);
+  }
+  */
+}
+
+function schedule_review_node_insert($node) {
+  // only insert into database if we need to (un)publish this node at some date
+  if (!empty($node->review_on)) {
+    db_insert('schedule_review')
+      ->fields(array(
+        'nid' => $node->nid,
+        'review_on' => $node->review_on,
+        'review_email' => $node->review_email
+      ))
+      ->execute();
+  }
+}
+
+function schedule_review_node_update($node) {
+  // only update database if we need to (un)publish this node at some date
+  // otherwise the user probably cleared out the (un)publish dates so we should remove the record
+  if (!empty($node->review_on)) {
+    db_merge('schedule_review')
+      ->key(array('nid' => $node->nid))
+      ->fields(array(
+          'review_on' => $node->review_on,
+          'review_email' => $node->review_email,
+        ))
+      ->execute();
+  }
+  else {
+    schedule_review_node_delete($node);
+  }
+}
+
+function schedule_review_node_delete($node) {
+  db_delete('schedule_review')
+    ->condition('nid', $node->nid)
+    ->execute();
+}
+
+/**
+ * Implements hook_cron
+ */
+function schedule_review_cron() {
+  $result = FALSE;
+  $date_format = variable_get('scheduler_date_format', SCHEDULER_DATE_FORMAT);
+
+  // If the time now is greater than the time to publish a node, publish it.
+  $queryResult = db_query('SELECT s.nid AS nid FROM {schedule_review} s LEFT JOIN {node} n ON s.nid = n.nid WHERE n.status = 1 AND s.review_on > 0 AND s.review_on < :now ', array(':now' => REQUEST_TIME));
+  $nids = array();
+  while ($node = $queryResult->fetchObject()) {
+    $nids[] = $node->nid;
+  }
+
+  $nids = array_unique(array_merge($nids, _scheduler_scheduler_nid_list('publish')));
+
+  $reviewers = array();
+  foreach ($nids as $nid) {
+    $n = node_load($nid);
+    // Use the actions system to publish the node.
+    watchdog('schedule_review', '@type: scheduled review of %title.', array('@type' => $n->type, '%title' => $n->title), WATCHDOG_NOTICE, l(t('view'), 'node/' . $n->nid));
+    $reviewers[$n->review_email][] = check_plain($n->title . ' - ' . url('node/' . $n->nid, array('absolute' => TRUE)));
+
+    // clear the review on since it has been published.
+    db_update('schedule_review')
+      ->fields(array('review_on' => 0))
+      ->condition('nid', $n->nid)
+      ->execute();
+    // Invoke scheduler API.
+    _scheduler_scheduler_api($n, 'review');
+
+    $result = TRUE;
+  }
+
+  foreach ($reviewers AS $email => $review) {
+    $params = array('body' => $review);
+    drupal_mail('schedule_review', 'review_email', $email, language_default(), $params);
+  }
+
+  return $result;
+}
+
+/**
+ * Implements hook_mail().
+ *
+ * Constructs the email notification message when the site is out of date.
+ *
+ * @param $key
+ *   Unique key to indicate what message to build, always 'status_notify'.
+ * @param $message
+ *   Reference to the message array being built.
+ * @param $params
+ *   Array of parameters to indicate what kind of text to include in the
+ *   message body. This is a keyed array of message type ('core' or 'contrib')
+ *   as the keys, and the status reason constant (UPDATE_NOT_SECURE, etc) for
+ *   the values.
+ *
+ * @see drupal_mail()
+ * @see _update_cron_notify()
+ * @see _update_message_text()
+ */
+function schedule_review_mail($key, &$message, $params) {
+  $message['subject'] = t('[RMetS] Content scheduled for review');
+  $message['body'] = $params['body'];
+}

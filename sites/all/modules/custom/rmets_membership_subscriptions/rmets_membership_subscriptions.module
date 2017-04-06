@@ -1,0 +1,242 @@
+<?php
+
+/**
+ * @file
+ * Show current subscriptions and those that need paying for.
+ */
+
+use Drupal\rmets_membership_user\EntityWrapper\User\UserWrapper;
+use Drupal\rmets_crm\Api\Request\GetMemberSubscriptionByIdRequest;
+use Drupal\rmets_crm\Api\Request\GetMemberSubscriptionJournalsRequest;
+use Drupal\rmets_crm\Api\Request\GetMembershipAccreditationItemByIdRequest;
+use Drupal\rmets_crm\Api\Request\GetMembershipPackagePricesByIdRequest;
+use Drupal\rmets_crm\Api\Request\InvalidRequestException;
+use Drupal\rmets_crm\Api\ApiServerException;
+
+
+/**
+ * Implements hook_menu().
+ */
+function rmets_membership_subscriptions_menu() {
+  $items = array();
+
+  $items['user/%user/my-subscriptions'] = array(
+    'title' => 'My Subscriptions',
+    'description' => 'Description',
+    'access callback' => 'user_view_access',
+    'access arguments' => array(1),
+    'page callback' => 'rmets_membership_subscriptions_view_page',
+    'page arguments' => array(1),
+    'type' => MENU_LOCAL_TASK,
+    'weight' => 3,
+  );
+
+  return $items;
+}
+
+function rmets_membership_subscriptions_view_page($account) {
+  $user_wrapper = new UserWrapper($account);
+  $user_wrapper->updateFromCrm();
+
+  $output = '<h2>Current Subscription</h2>';
+  $subscription_id = $user_wrapper->getActiveSubscriptionID();
+  if (!empty($subscription_id)) {
+    module_load_include('inc', 'rmets_membership_purchase', 'rmets_membership_purchase.form_options');
+    $unpaid_membership_subscriptions = $user_wrapper->getAllUnpaidSubscriptionPayments();
+    if (empty($unpaid_membership_subscriptions)) {
+      /** @var \Drupal\rmets_crm\Model\Subscription $current_membership_subscription */
+      $current_membership_subscription = rmets_membership_subscriptions_get_subscription($subscription_id);
+      if (!empty($current_membership_subscription)) {
+        $output .= '<strong>Type:</strong> ' . $current_membership_subscription->getMembershipPackagePriceName() . '<br />';
+        $output .= '<strong>Valid from:</strong> ' . $current_membership_subscription->getValidFromDate() . '<br />';
+        $output .= '<strong>Valid to:</strong> ' . $current_membership_subscription->getValidToDate() . '<br />';
+        $id = $current_membership_subscription->getAccreditationItemId();
+        //$id = '39bbf6b3-96cd-e411-80cf-00155d8738c4';
+        if (!empty($id)) {
+          $accreditations = '<strong>Accreditations:</strong> ' . current(rmets_membership_subscriptions_get_accreditation_by_id($id)->getIterator())->getName();
+        }
+
+        $current_membership_journals = rmets_membership_subscriptions_get_current_journals($user_wrapper, $subscription_id);
+        $journals = array();
+        foreach ($current_membership_journals AS $current_membership_journal) {
+          $journal_name = rmets_membership_purchase_journal_options_get_name($current_membership_journal->getName());
+          $item_name = rmets_membership_purchase_journal_options_is_weather($journal_name) ? trim($journal_name) : $current_membership_journal->getName();
+          $journals[] = $item_name;
+        }
+        if (!empty($journals)) {
+          $output .= '<strong>Journals:</strong> ' . implode(', ', $journals) . '<br />';
+        }
+        if (!empty($accreditations)) {
+          $output .= $accreditations;
+        }
+      }
+      else {
+        $output .= 'There is a problem getting your subscription information.';
+      }
+    }
+    else {
+      $output = '<h2>Unpaid Subscriptions</h2>';
+      foreach ($unpaid_membership_subscriptions AS $unpaid_membership_subscription) {
+        /** @var Drupal\rmets_crm\Model\PaymentSchedule $unpaid_membership_subscription */
+        $unpaid_membership_subscription_full = rmets_membership_subscriptions_get_subscription($unpaid_membership_subscription->getSubscriptionID());
+        if (!empty($unpaid_membership_subscription_full)) {
+          $id = $unpaid_membership_subscription_full->getAccreditationItemId();
+          //$id = '39bbf6b3-96cd-e411-80cf-00155d8738c4';
+          if (!empty($id)) {
+            $accreditations = '<strong>Accreditations</strong>: ' . current(rmets_membership_subscriptions_get_accreditation_by_id($id)->getIterator())->getName();
+          }
+          $unpaid_membership_journals = rmets_membership_subscriptions_get_current_journals($user_wrapper, $unpaid_membership_subscription->getSubscriptionID());
+          $journals = array();
+          foreach ($unpaid_membership_journals AS $unpaid_membership_journal) {
+            $journal_name = rmets_membership_purchase_journal_options_get_name($unpaid_membership_journal->getName());
+            $item_name = rmets_membership_purchase_journal_options_is_weather($journal_name) ? trim($journal_name) : $unpaid_membership_journal->getName();
+            $journals[] = $item_name;
+          }
+
+          /** @var \Drupal\rmets_crm\Model\Subscription $unpaid_membership_subscription_full */
+          $output .= '<strong>Type:</strong>  ' . $unpaid_membership_subscription_full->getMembershipPackagePriceName() . '<br />';
+          $output .= '<strong>Valid from:</strong> ' . $unpaid_membership_subscription_full->getValidFromDate() . '<br />';
+          $output .= '<strong>Valid to:</strong> ' . $unpaid_membership_subscription_full->getValidToDate() . '<br />';
+          if (!empty($journals)) {
+            $output .= '<strong>Journals:</strong> ' . implode(', ', $journals) . '<br />';
+          }
+          if (!empty($accreditations)) {
+            $output .= $accreditations . '<br />';
+          }
+          $output .= '<br /><strong>Due Date:</strong> ' . $unpaid_membership_subscription->getDueDateFormatted();
+          $output .= '<br /><strong>Total Due:</strong> &pound;' . $unpaid_membership_subscription->getAmountFormatted() . '<br />';
+          $output .= '<a href="/membership/renew?product=' . $unpaid_membership_subscription_full->getMembershipPackagePriceID() . '&subscription=' . $unpaid_membership_subscription_full->getSubscriptionId() . '" class="button-link orange large">Pay now</a>';
+          $output .= '<hr />';
+        }
+        else {
+          $output .= 'There is a problem getting your subscription information.';
+          break;
+        }
+      }
+    }
+  }
+  else {
+    $output = '<p>You currently have no subscription.</p>';
+  }
+
+  return $output;
+}
+
+function rmets_membership_subscriptions_get_subscription($subscription_id) {
+  try {
+    $request = new GetMemberSubscriptionByIdRequest();
+    $request->setGuid(variable_get('rmets_crm_api_guid', ''));
+    $request->setSubscriptionId($subscription_id);
+    $request->setPage(1);
+    $request->setRecordCount(100);
+
+    /** @var \Drupal\rmets_crm\Api\CrmService $api */
+    $api = rmets_crm_get_api();
+    $response = $api->getMemberSubscriptionByID($request);
+    return $response->getIterator()->current();
+  }
+  catch (InvalidRequestException $e) {
+    watchdog('CRM', 'There was an error returned when making a request for "getMemberSubscriptionByID" on the API: %ex', array('%ex' => $e->getMessage()), WATCHDOG_ERROR);
+  }
+  catch (ApiServerException $apie) {
+    watchdog('CRM', 'Unable to communicate with the CRM API: %ex', array('%ex' => $apie->getMessage()), WATCHDOG_CRITICAL);
+  }
+  return NULL;
+}
+
+function rmets_membership_subscriptions_get_current_journals($user_wrapper, $subscriptionId) {
+  try {
+    $request = new GetMemberSubscriptionJournalsRequest($user_wrapper);
+    $request->setGuid(variable_get('rmets_crm_api_guid', ''));
+    $request->setSubscriptionId($subscriptionId);
+    $request->setPage(1);
+    $request->setRecordCount(100);
+
+    /** @var \Drupal\rmets_crm\Api\CrmService $api */
+    $api = rmets_crm_get_api();
+    $response = $api->getMemberSubscriptionJournals($request);
+    return $response;
+  }
+  catch (InvalidRequestException $e) {
+    watchdog('CRM', 'There was an error returned when making a request for "getMemberSubscriptionJournals" on the API: %ex', array('%ex' => $e->getMessage()), WATCHDOG_ERROR);
+  }
+  catch (ApiServerException $apie) {
+    watchdog('CRM', 'Unable to communicate with the CRM API: %ex', array('%ex' => $apie->getMessage()), WATCHDOG_CRITICAL);
+  }
+}
+
+function rmets_membership_subscriptions_get_accreditation_by_id($accreditation_item_id) {
+  try {
+    $request = new GetMembershipAccreditationItemByIdRequest();
+    $request->setGuid(variable_get('rmets_crm_api_guid', ''));
+    $request->setAccreditationItemID($accreditation_item_id);
+    $request->setPage(1);
+    $request->setRecordCount(100);
+
+    /** @var \Drupal\rmets_crm\Api\CrmService $api */
+    $api = rmets_crm_get_api();
+    $response = $api->getMembershipAccreditationItemById($request);
+    return $response;
+  }
+  catch (InvalidRequestException $e) {
+    watchdog('CRM', 'There was an error returned when making a request for "getMembershipAccreditationItemById" on the API: %ex', array('%ex' => $e->getMessage()), WATCHDOG_ERROR);
+  }
+  catch (ApiServerException $apie) {
+    watchdog('CRM', 'Unable to communicate with the CRM API: %ex', array('%ex' => $apie->getMessage()), WATCHDOG_CRITICAL);
+  }
+}
+
+function rmets_membership_subscriptions_get_membership_by_id($membership_package_id) {
+  try {
+    $request = new GetMembershipPackagePricesByIdRequest();
+    $request->setGuid(variable_get('rmets_crm_api_guid', ''));
+    $request->setMembershipPackagePriceId($membership_package_id);
+    $request->setPage(1);
+    $request->setRecordCount(100);
+
+    /** @var \Drupal\rmets_crm\Api\CrmService $api */
+    $api = rmets_crm_get_api();
+    $response = $api->getMembershipPackagePricesById($request);
+    return $response->getIterator()->current();
+  }
+  catch (InvalidRequestException $e) {
+    watchdog('CRM', 'There was an error returned when making a request for "getMembershipPackagePricesById" on the API: %ex', array('%ex' => $e->getMessage()), WATCHDOG_ERROR);
+  }
+  catch (ApiServerException $apie) {
+    watchdog('CRM', 'Unable to communicate with the CRM API: %ex', array('%ex' => $apie->getMessage()), WATCHDOG_CRITICAL);
+  }
+}
+
+/**
+ * Determine if an order contains an CRM membership product.
+ */
+function rmets_membership_subscriptions_order_contains_rmets_membership($order) {
+  $order = commerce_order_load($order->order_number);
+  $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
+  $line_items = $order_wrapper->commerce_line_items->value();
+  foreach ($line_items as $line_item) {
+    $line_item_wrapper = entity_metadata_wrapper('commerce_line_item', $line_item);
+    $product = $line_item_wrapper->commerce_product->value();
+    if (rmets_membership_subscriptions_is_subscription_product($product)) {
+      return TRUE;
+    }
+  }
+  return FALSE;
+}
+
+/**
+ * Check if a given product is an rmets subscription.
+ * This is a rules condition callback as well.
+ *
+ * @param commerce_product $product
+ *   A loaded commerce product
+ *
+ * @return boolean
+ *   TRUE if it is of a smart impact rmets subscription product type.
+ */
+function rmets_membership_subscriptions_is_subscription_product($product) {
+  if ($product && is_object($product) && isset($product->type)) {
+    return $product->type == 'rmets_membership_smartimpact';
+  }
+  return FALSE;
+}

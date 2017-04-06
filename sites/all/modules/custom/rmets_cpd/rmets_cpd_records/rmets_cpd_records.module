@@ -1,0 +1,189 @@
+<?php
+
+/**
+ * @file
+ * RMetS CPD Records module file.
+ */
+
+/**
+ * Implements hook_permission().
+ */
+function rmets_cpd_records_permission() {
+  return array(
+    'view edit own cpd records' => array(
+      'title' => 'View & Edit Own CPD records',
+      'description' => 'Allows user to be able to view & edit their own CPD records',
+    ),
+    'view other users cpd records' => array(
+      'title' => 'View Other Users CPD records',
+      'description' => 'Allows user to be able to view other users CPD records',
+    ),
+    'view edit other users cpd records' => array(
+      'title' => 'View & Edit Other Users CPD records',
+      'description' => 'Allows user to be able to view & edit other users CPD records',
+      'restrict access' => TRUE,
+    ),
+  );
+}
+
+function _rmets_cpd_record_review_access_permission() {
+  return 'view other users cpd records';
+}
+
+function _rmets_cpd_objective_review_access_permission() {
+  return 'view other users cpd records';
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter() for hook_form_alter().
+ */
+function rmets_cpd_records_form_cpd_record_node_form_alter(&$form, &$form_state) {
+  // Change the 'add another item' text.
+  $form['field_web_references_link'][LANGUAGE_NONE]['add_more']['#value'] = 'Add another link';
+  $form['field_objective_references'][LANGUAGE_NONE]['add_more']['#value'] = 'Select another objective';
+
+  // Hide the 'Preview Changes' button.
+  $form['actions']['preview_changes']['#access'] = FALSE;
+
+  // Populate the cpd_record form with data from an event.
+  if (arg(3) == 'event' && arg(4) != '' && is_numeric(arg(4))) {
+    $event_node = node_load(arg(4));
+    // Check that the node is an event node.
+    if ($event_node->type != 'event') {
+      drupal_set_message(t('The selected event is not a valid event.'), 'error');
+      drupal_access_denied();
+    }
+    $event_wrapper = entity_metadata_wrapper('node', $event_node);
+
+    // Event data.
+    $event_body = $event_wrapper->body->value();
+    $event_date = $event_wrapper->field_event_date->value();
+    $event_url = url('node/' . $event_node->nid, array('absolute' => TRUE));
+
+    // Populate the form with data from the event node.
+    $form['title']['#default_value'] = $event_wrapper->title->value();
+    $form['body'][LANGUAGE_NONE][0]['#default_value'] = $event_body['value'];
+    $form['field_date_completed'][LANGUAGE_NONE][0]['#default_value']['value'] = $event_date['value'];
+    $form['field_web_references_link'][LANGUAGE_NONE][0]['#default_value']['url'] = $event_url;
+  }
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter() for hook_form_alter().
+ */
+function rmets_cpd_records_form_cpd_objective_node_form_alter(&$form, &$form_state) {
+  // Change the 'add another item' text.
+  $form['field_web_references_link'][LANGUAGE_NONE]['add_more']['#value'] = 'Add another link';
+
+  // Hide the 'Preview Changes' button.
+  $form['actions']['preview_changes']['#access'] = FALSE;
+}
+
+/**
+ * Implements hook_views_plugins().
+ */
+function rmets_cpd_records_views_plugins() {
+  $plugins = array(
+    'argument default' => array(
+      'rmets_cpd_records_user_objectives' => array(
+        'title' => t('RMetS CPD - User Objectives'),
+        'handler' => 'views_plugin_argument_user_cpd_objectives',
+        'path' => drupal_get_path('module', 'rmets_cpd_records') . '/plugins/views',
+      ),
+    ),
+    'access' => array(
+      'rmets_cpd_records_access_cpd' => array(
+        'title' => t('RMetS CPD Access'),
+        'handler' => 'views_plugin_access_cpd',
+        'path' => drupal_get_path('module', 'rmets_cpd_records') . '/plugins/views',
+      ),
+    ),
+  );
+  return $plugins;
+}
+
+/**
+ * Implements hook_preprocess_node().
+ */
+function rmets_cpd_records_preprocess_node(&$vars) {
+  global $user;
+
+  // Check that the user has access to the CPD section before showing the link.
+  if (!rmets_cpd_access($user)) {
+    return;
+  }
+
+  if ($vars['type'] == 'event') {
+    // Add the link to the event node to add a new CPD record for that event.
+    $vars['event_add_cpd_record_link'] = array(
+      '#theme' => 'link',
+      '#text' => t('Create CPD record from this event'),
+      '#path' => 'node/add/cpd-record/event/' . $vars['nid'],
+      '#options' => array(
+        'html' => TRUE,
+        'attributes' => array(
+          'title' => t('Create CPD record from this event'),
+          'class' => 'button-link',
+        ),
+        'query' => array(
+          'destination' => 'user/' . $user->uid . '/cpd/records&uid=' . $user->uid
+        )
+      ),
+    );
+  }
+}
+
+/**
+ * Implements hook_views_pre_build().
+ */
+function rmets_cpd_records_views_pre_build($view) {
+  // Add the intro text to the header of the views.
+  if ($view->current_display == 'cpd_record_page' || $view->current_display == 'cpd_objective_page') {
+    $intro_text = variable_get('rmets_' . $view->current_display . '_list_intro', '');
+    $intro_content = str_replace('[' . $view->current_display . '_intro_text]', $intro_text, $view->header['area_1']->options['content']);
+    $view->header['area_1']->options['content'] = $intro_content;
+
+    // Add print link to the footer.
+    /*$link = print_insert_link();
+    dpm($link);
+    $footer_print_link = str_replace('[print_pdf_link]', $link, $view->footer['area']->options['content']);
+    $view->footer['area']->options['content'] = $footer_print_link;*/
+  }
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function rmets_cpd_records_form_views_exposed_form_alter(&$form, $form_state) {
+  // Turn the objectives filter from textfield to select.
+  if (isset($form['field_objective_references_target_id'])) {
+    $user_objectives = array();
+    $user_objective_ids = array();
+
+    global $user;
+    // Get the users objectives.
+    $query = new EntityFieldQuery();
+    $entities = $query->entityCondition('entity_type', 'node')
+      ->propertyCondition('type', 'cpd_objective')
+      ->propertyCondition('uid', $user->uid)
+      ->execute();
+
+    if (isset($entities['node']) && is_array($entities['node'])) {
+      foreach ($entities['node'] as $entity) {
+        $user_objective_ids[] = $entity->nid;
+      }
+    }
+
+    // @todo EntityFieldQuery to get ids
+    $objectives_list = entity_load('node', $user_objective_ids);
+    foreach ($objectives_list as $objective) {
+      $user_objectives[$objective->nid] = $objective->title;
+    }
+
+    $field_objectives = &$form['field_objective_references_target_id'];
+    $field_objectives['#type'] = 'select';
+    $keyed_objectives = empty($user_objectives) ? array() : $user_objectives;
+    $field_objectives['#options'] = array('' => '- ' . t('Any') . ' -') + $keyed_objectives;
+    unset($field_objectives['#size']);
+  }
+}

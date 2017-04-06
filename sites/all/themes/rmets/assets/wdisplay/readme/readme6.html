@@ -1,0 +1,660 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+	<head>
+		<title>Weather Display Live</title>
+		<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+	    <link href="readme.css" rel="stylesheet" type="text/css" />
+		</head>
+	<body id="tab7">
+		<h1>Weather Display Live - Getting Started
+		</h1>
+		<ul id="tabnav">
+			<li class="tab1"><a href="readme.html">Overview</a></li>
+			<li class="tab2"><a href="readme1.html">Installation</a></li>
+			<li class="tab3"><a href="readme2.html">Upgrading</a></li>
+			<li class="tab4"><a href="readme3.html">Configuring</a></li>
+			<li class="tab5"><a href="readme4.html">Purchasing</a></li>
+			<li class="tab6"><a href="readme5.html">Troubleshooting</a></li>
+			<li class="tab7"><a href="readme6.html">Releases</a></li>	
+		</ul>
+
+		<h3>Release History</h3>
+		<table width="75%" border="0" cellpadding="2" cellspacing="0" class="release">
+		<tr valign="top">
+		  <td>v6_03</td>
+		  <td>27/09/2008</td>
+		  <td><p>More changes to languages<br />
+	        More options for auto saving configurationf files in the Configurator <br />
+		    Option to create backup file in Configurator when you save<br />
+		    Added version comparison to Configurator<br />
+		    Wind scales now start at 20<br />
+		    Fixed bug with red blue increasing decreasing arrow erroneously appearing on some text boxes<br />
+		    Rain rate / hour now handled by Options option in Configurator. &lt;showrainratehour&gt; tag deprecated.<br />
+		    Smoother solar last 24 hours graph <br />
+		    Min / max humidity now available <br />
+	      Modified WDL to work with new format lat / long from WD<br />
+	      Added 'Open with' option to right click menu in Windows for xml files
+</p>
+	      </td>
+		  </tr>
+		<tr valign="top">
+		  <td>v6_02</td>
+		  <td>05/08/2008</td>
+		  <td><p>Fixed FWI tooltip<br />
+		    Added 64 bit compatibility to Configurator<br />
+		    Fixed compass background gradient fill<br />
+		    Added temperature gauge to Configurator extra sensor options<br /> 
+		    Fixed trend arrows on text boxes that shouldn't have been appearing<br />
+		    Added method to insert line breaks on tool tips<br />
+		    Added German translations<br />
+		    Added more discrete error logging levels in Configurator<br />
+		    Fixed sun / moon options in Configurator<br />
+		    Small tweak to positional information for the vertical dual temperature instrument <br /> 
+            <br />
+            </p>	      </td>
+		  </tr>
+		<tr valign="top">
+		  <td>v6_01</td>
+		  <td>01/08/2008</td>
+		  <td><p>Fixed dual wind rotating<br />
+		    Fixed heat / windchill auto swap<br />
+		    Fixed extra temp style issues <br />
+		    Fixed multiple language amendments<br />
+		    Fixed tool tip for mercury barometer<br />
+		    Added dew point to records screen<br />
+		    Added ability to change gauge, dials and meter colours in premium version<br />
+		    Minor changes to gauge scales<br />
+	      Added video  (flv) support<br />
+		  Added the WDL Configurator</p>	      </td>
+		  </tr>
+		<tr valign="top">
+		  <td>v5_04</td>
+		  <td>08/03/2008</td>
+		  <td>Added Hungarian language<br />
+		    Added Bulgarian language<br />
+		    Modifications to Swedish language<br />
+		    Fixed partly cloudy night icon bug in Premium version<br />
+		    Corrected errors in documentation regarding dual temp instrument<br />
+		    Fixed locking of temp scales when apparent temperature displayed.<br />
+		    Modifications to Norwegian language<br />		    
+		    Modifications to Portuguese language<br />
+		    Fixed lightning -ic +cg values which were interchanged<br />
+		    Modifications to spanish language<br />
+		    Added widescreen option for webcams<br />
+		    Moon is now correct for southern hemisphere<br />
+		    Windy rain icon added <br />
+		    Wet bulb instrument added <br />
+		    Embedded graphs can now open full graph display <br />		    
+		    Added ability to lock 
+		    wind scales<br />
+		    New graphs of barometer last hour and humidity last hour<br />
+		    Graph of wind speed last hour now has average and gust lines		    <br />
+		    Last hour graphs of temperature, rainfall, windspeed, wind direction, barometer and humidity all use new clientrawhourly file which gives 60 data points for more detailed and smoother graphs</td>
+		  </tr>
+		<tr valign="top">
+		  <td>v5_03</td>
+		  <td>03/06/2007</td>
+		  <td>Restored Finnish language <br />
+		    Fixed non working change of units on 7 day graphs<br />
+		    Fixed French language compass error<br />
+		    Weather station name and heartbeat now appear behind other screens again<br />
+		    Added miscellaneous French translations<br />
+		    Fixed Beaufort text missing on a wind dial<br />
+		    Fixed scale on dual temp instrument<br />
+	      Greek text properly aligned on buttons again. <br />
+	      Added weather warning forecast over-ride option. </td>
+		  </tr>
+		<tr valign="top">
+		  <td>v5_02</td>
+		  <td>27/05/2007</td>
+		  <td>Increased webcam  minimum refresh rate to 5 seconds<br />
+		    Added Czech language<br />
+		    Many language tweaks<br />
+		    Changed the way WDL loads files on initialisation <br />
+		    Fixed records refresh bug<br />
+		    Mouse wheel will now scroll all WDL combo boxes (when using Windows)<br />
+		    Many new graphs added - mostly for 7 day readings<br />
+		    UV, soil and solar instruments are now more reliably indicated in Records screen<br />		     
+		    Lightning	strikes	per hour now indicated more accurately for Nexstorm users<br />
+		    Previous 24 hours Lightning bug fixed
+		    <br />
+		    Trend	arrows	added to text boxes for humidity, temperature ahd humidex <br />
+		    Error messages when attempting to load cross-domain improvements<br />
+		    Serial number no longer required for .exe version<br /> 
+		    New	premium	version options including styling of text, use of own icons and configuring of heartbeat indicator, WDL logo button and station name</td>
+		  </tr>
+		<tr valign="top">
+		  <td>v5_01</td>
+		  <td>18/12/2006</td>
+		  <td><p>Fixed Greek language compass translation<br />
+		    Fixed maximum beaufort bug<br />
+		    Dutch and Norwegian language corrections.<br />
+		    Fixed snow season tool tip error.<br />
+		    Change to Flash v8 means you can now use png, gifs, progressive jpg for webcams, maps etc. <br />
+		    Reworked solar bar options<br />
+		    Changed lightning last hours drop down list so they match the change to Weather Display <br />
+		    Added &lt;options&gt; to instBarometer. 1 = QNH, 2 = QFE; tooltip is removed in this situation.<br />
+		    Flash version from v5 checking now built into WDL<br />
+		    WDL can now display 5m of rainfall and additional intermediate scales introduced<br />
+		    Dual wind  instrument can display temp and wind direction - options 1= wind direction, 2 = temp, 3 = both<br />
+		    Fixed humidity x axis labels on graphs<br />
+		    New installer for Weather Display Live <br />
+		    New Leaf wetness instrument<br />
+		    New soil moisture text box<br />
+		    New snow depth text box
+		    <br />
+	      New html page with swfobject to avoid click to activate issues with IE and Flash installation and version checking. <br />Records page no longer shows unavailable sensors
+		  <br />
+		  Webcams reworked to allow for multiple embedded ones </p>	      </td>
+		  </tr>
+		<tr valign="top">
+				<td>v4_15</td>
+				<td>23/09/2006</td>
+				<td>
+					<P>Fixed missing text from Beaufort instrument<BR>
+Many language tweaks<BR>
+Removed kph as an option for wind speed unit<BR>
+Added new units screen<BR>
+Fixed autoscaling on wind direction graphs<BR>
+Fixed y scale text spacing on embedded graphs<BR>
+Faster first load of embedded graphs<BR>
+Fixed desktop version not updating correctly<BR>
+Fixed bug with WDL not updating with certain file names in URL path					</P>				</td>
+		  </tr>
+			<tr valign="top">
+				<td>v4_14</td>
+				<td>10/09/2006</td>
+				<td>
+					<P>Added trend arrows for humidity, humidex and temperature&nbsp;including the
+						ability to globally turn off all trends.
+						<BR>
+						Many language updates including missing&nbsp;Portuguese characters.<BR>
+						Fixed &lt;title&gt; tag for Beaufort instrument.
+						<BR>
+						Added Frisian language.
+						<BR>
+						Added wind direction for last hour graph.<BR>
+						Beaufort wind object has options for displaying scale or text only.<BR>
+						Fixed problem with graph taking long time to load when the refresh rate is set.<BR>
+						Added sunshine hours option to solar instrument.<BR>
+						Added ability to hide indoor temperature graph.<BR>
+						Added WD data feed version number to heartbeat indicator.<BR>
+						Added option to launch full version of MML from WDL MML button.					</P>				</td>
+			</tr>
+			<tr valign="top">
+				<td>v4_13</td>
+				<td>11/06/2006</td>
+				<td>Minor language amendments to Norwegian and Italian.<br>
+					Fixed extraneous white elements in beaufort instrument.<br>
+					Fixed tool tip problem with embedded graphs.<br>
+					Added Greek language.</td>
+			</tr>
+			<tr valign="top">
+				<td>v4_12</td>
+				<td>28/05/2006</td>
+				<td>Minor language amendments.<br>
+					Added indoor temperature to graphs.<br>
+					Added all time records for solar and UV.<br>
+					Added FWI instrument.<br>
+					Cloudbase scale changed to make the divisions sensible.<br>
+					Added embeddable graphs.<br>
+					Added beaufort instrument.</td>
+			</tr>
+			<tr valign="top">
+				<td>v4_11</td>
+				<td>05/02/2006</td>
+				<td>Recalibrated temp gauge dial, bulbs, dual temp instruments and added easing.<br>
+					Added desktop MML lite capability.
+					<br>
+					Minor changes to languages.<br>
+					Added min max to dew gauge and added min max text box for dew.<br>
+					Fixed refresh problem with embedded webcam.<br>
+					Added premium version option.
+					<br>
+					Fixed last hour scale wind bug.<br>
+					Day night switching for webcam.<br>
+					Added blue moon functionality.
+					<br>
+					Added 24 hour humidity graph.<br>
+					Added 31 day humidity graph.</td>
+			</tr>
+			<tr valign="top">
+				<td>v4_10</td>
+				<td>13/11/2005</td>
+				<td>Moon rotation whilst loading reinstated. Moon will move gracefully to required
+					illumination.<br>
+					Added Faroese language<br>
+					Added max min temperature values for 8 extra sensors.<br>
+					More language amendments.<br>
+					Fixed tool tip bug with current conditions.<br>
+					Added improvements to MML "lite".
+					<br>
+					Added xhtml compliant version of index.html.</td>
+			</tr>
+			<tr valign="top">
+				<td>v4_09</td>
+				<td>04/11/2005</td>
+				<td>Fixed problem with "dynamic moon" at 0% illumination.<br>
+					Amendments to Italian language.<br>
+					Added km/h as default for Portuguese languaga.<br>
+					Fixed bug with hyperlinks on instruments.<br>
+					Amended pre-built config files so that wind instruments text doesn't overlap
+					other instruments.<br>
+					Added coloured icons to wind dual instrument text.<br>
+					Added options tag to sun moon icon.</td>
+			</tr>
+			<tr valign="top">
+				<td>v4_08</td>
+				<td>01/11/2005</td>
+				<td>Fixed bug with some 24 hour graphs.<br>
+					Amendments to all languages.<br>
+					Added ability to hide text from below wind instruments.<br>
+					Added dual wind instrument.<br>
+					Amended moon icon.<br>
+					Amended multiple webcam refresh routine.<br>
+					Added option to display tooltips without hyperlinks.</td>
+			</tr>
+			<tr valign="top">
+				<td>v4_07</td>
+				<td>11/10/2005</td>
+				<td>Modified moon phase icon to work correctly.<br>
+					Changed 24 hour graphs so they can show full 24 hour data if available.<br>
+					Added moon age in days to sun / moon instrument.<br>
+					Fixed error in Dutch language.
+					<br>
+					Fixed bug with 7 day rainfall graph for Sunday.				</td>
+			</tr>
+			<tr valign="top">
+				<td>v4_06</td>
+				<td>08/10/2005</td>
+				<td>Modified weekly and annual rainfall graphs so they display backwards from
+					current day and month respectively.
+					<br>
+					Modified rainrate record in Records screen so it indicates /hour if that's what
+					in the config file.<br>
+					Modified yesterdays rain value.<br>
+					WDL running on localhost will always work in evaluation mode because of a
+					security problem found.<br>
+					Added Estonian language.<br>
+					If using autoheatwindchill then heat button will now disappear with the heat
+					instrument. Buttons will move along as appropriate.<br>
+					Animated all temperature instruments including dual temperature versions.<br>
+					Added option to embed webcam in WDL main screen,<br>
+					Added new Sun and Moon instrument to show rise and set times and phases of the
+					moon.				</td>
+			</tr>
+			<tr valign="top">
+				<td>v4_05</td>
+				<td>16/09/2005</td>
+				<td>Fixed wind direction graph changing with wind units.<br>
+					Fixed Dutch language for third time.<br>
+					Fixed bug with VU meter instrument launching barometer graph when showing
+					humidity.<br>
+					Added German language corrections.<br>
+					Made other language corrections.<br>
+					Changed priority for weather icons.<br>
+					Added animated snow icon.<br>
+					Added last 12 months rainfall graph.<br>
+					Added last 31 days wind direction graph (20 graphs now available).</td>
+			</tr>
+			<tr valign="top">
+				<td>v4_04</td>
+				<td>05/09/2005</td>
+				<td>Fixed max/min apparent temperature units,<br>
+					Fixed max/min apparent temperature not switching units.<br>
+					Added max/min apparent temps to temperature instruments.<br>
+					Added more lines to current conditions / forecast text.<br>
+					More minor language corrections.<br>
+					Added time to 'No Data' warning of last valid data.<br>
+					Added ability for icon to follow conditions or forecast text.<br>
+					Added ability for instrument tool tips to launch appropriate graph if
+					available.				</td>
+			</tr>
+			<tr valign="top">
+				<td>v4_03</td>
+				<td>28/08/2005</td>
+				<td>Fixed Dutch compass direction label next to degrees.<br>
+					Fixed bug with tool tips on temperature instruments.
+					<br>
+					Fixed Beaufort text on gauge type wind instrument.
+					<br>
+					A few corrections and additions for several languages.
+					<br>
+					Added wind direction for last 24 hours to graph.
+					<br>
+					Added yesterdays rain (if applicable).
+					<br>
+					Added support for Weather Wing.
+					<br>
+					Station URL for Metars now generated within WDL.
+					<br>
+					Added multiple webcam option.<br>
+					Added refresh LED on webcam screen.
+					<br>
+					Added apparent temperature min/max text.				</td>
+			</tr>
+			<tr valign="top">
+				<td>v4_02</td>
+				<td>09/07/2005</td>
+				<td><p>Fixed "undefined" appearing in station name.<br>
+						Fixed direction on compass for Dutch language.
+						<br>
+						Fixed l2k close button bug.<br>
+						Added optional button to MML screen to launch full version.<br>
+						Added title and URL tooltip options for most instruments when displayed as text
+						boxes including barometer, ET, current conditions etc - in fact everything, I
+						think, apart from min max and rainfall rate.<br>
+						Added max gust last hour indicator to wind dials.
+					</p>				</td>
+			</tr>
+			<tr valign="top">
+				<td>v4_01</td>
+				<td>26/06/2005</td>
+				<td>Fixed bug with heat on dual temp instrument.<br>
+					Fixed bug with ET not changing units.<br>
+					Added session timeout option.<br>
+					Added auto swap for heat and windchill instruments.<br>
+					Added barometer min/max text box.<br>
+					Added min/max to gauge barometer.<br>
+					Fixed bug with certain values of cloud height causing instrument to sit at
+					ground level when first started.<br>
+					New icons.<br>
+					Fixed solar text oddities.<br>
+					Text box option for wind average, gust and direction.
+					<br>
+					Added repeat checkbox for lightning playback.<br>
+					No more white backgrounds whilst WDL is loading.<br>
+					Added no data warning option.
+					<br>
+					More tweaks to languages including addition of Portuguese.<br>
+					Added MesoMap Live "lite".</td>
+			</tr>
+			<tr valign="top">
+				<td>v3_12</td>
+				<td>06/03/2005</td>
+				<td>Fixed bug with extra sensors when used in dual temp instrument. (If you've been
+					using the workaround you'll need to now remove it.)<br>
+					Corrected 30 days barometer graph x axis label.<br>
+					Added new translations.<br>
+					Fixed bug with locking of dual temp instrument scales.<br>
+					Added Nexstorm last 24 hours lightning activity graph.<br>
+					Added new temperature horizontal linear bar instrument.<br>
+					Added new dual temperature horizontal linear bar instrument.				</td>
+			</tr>
+			<tr valign="top">
+				<td>v3_11</td>
+				<td>18/02/2005</td>
+				<td>Fixed bug with colour of text on linear temperature instrument.</td>
+			</tr>
+			<tr valign="top">
+				<td>v3_10</td>
+				<td>17/02/2005</td>
+				<td>Fixed bug that was causing text boxes to fail to display values if snow was
+					displayed.<br>
+					Added soil temperature instrument.<br>
+					Added white background to linear temperature instrument.</td>
+			</tr>
+			<tr valign="top">
+				<td>v3_09</td>
+				<td>12/02/2005</td>
+				<td>Fixed bug with apparent and dew max min indicators on gauges.<br>
+					Fixed bug with rain rate / hour.<br>
+					Fixed bug with lightning playback.<br>
+					Added only show forecast option.<br>
+					Added ability to set clientrawextra to fast update.<br>
+					Changed lightning icon to show for 5 minutes once triggered.<br>
+					Updated mist and fog icons.
+					<br>
+					Added wind icon.<br>
+					Added dual temperature instrument with ability to choose what is displayed.<br>
+					Added solar W/m<sup>2</sup> bar option.<br>
+					Corrected mB abbreviation to mb.				</td>
+			</tr>
+			<tr valign="top">
+				<td>v3_08</td>
+				<td>23/01/2005</td>
+				<td>Added new temperature gauge.<br>
+					Added new barometer gauge.<br>
+					Added new rain gauge.<br>
+					Added ability for WDL to work on a secure (https) website.<br>
+					Added ability to lock temperate scales.
+					<br>
+					Number of lines for Current Conditions text increased.<br>
+					Minor language tweaks.				</td>
+			</tr>
+			<tr valign="top">
+				<td>v3_07</td>
+				<td>16/01/2005</td>
+				<td>Added new wind gauges.<br>
+					Added new temperature gauges.<br>
+					Solar and UV bars now change colour gradually rather than stepped.<br>
+					Minor modifications to German and Italian languages.</td>
+			</tr>
+			<tr valign="top">
+				<td>v3_06</td>
+				<td>08/01/2005</td>
+				<td>Added last 24 hour history for Nexstorm.<br>
+					Added optional distance rings for Nexstorm.<br>
+					Added options to remove graphs displayed.<br>
+					Added option to choose intial graph displayed.<br>
+					Reduced snowfall to one decimal place to avoid rounding errors when displayed
+					in inches.</td>
+			</tr>
+			<tr valign="top">
+				<td>v3_06</td>
+				<td>21/12/2004</td>
+				<td>Fixed bug with zoomed lightning map not loading correctly.				</td>
+			</tr>
+			<tr valign="top">
+				<td>v3_04</td>
+				<td>13/12/2004</td>
+				<td>Fixed refresh rate bug.</td>
+			</tr>
+			<tr valign="top">
+				<td>v3_03</td>
+				<td>12/12/2004</td>
+				<td><p>Added ability to zoom as per Nexstorm applet<br>
+						Added ability to select speed of playback from x15 to x720<br>
+						Increased persistence of strike type.<br>
+						Added ability to step through manually when playback is paused.<br>
+						Added marker on x axis of graph during playback.<br>
+						Added max strike/min and strike now rates.<br>
+						Added highlight to time window when playing back.<br>
+						Added option to display snow in cm or inches and a button option for user to
+						choose<br>
+						Added indoor temp min/max display.
+						<br>
+						Increased wind dials so they now auto scale up to 200
+						<br>
+						Fixed bug with dewpoint in text when snowfall was displayed.<br>
+						Changed refresh system to reduce cpu usage<br>
+						Language tweaks<br>
+						Hopefully stopped data showing when clientraw is corrupted.</p>				</td>
+			</tr>
+			<tr valign="top">
+				<td>v3_02</td>
+				<td>09/11/2004</td>
+				<td><p>Added Nexstorm and Lightning 2000 integration<br>
+						Fixed bug with Apparent temperature tool tip text<br>
+						Fixed bug with Apparent temp and Heat index when displayed in text box.
+						<br>
+						Fixed bug with current conditions<br>
+						Corrected some language text
+					</p>				</td>
+			</tr>
+			<tr valign="top">
+				<td>v3_01</td>
+				<td>30/10/2004</td>
+				<td>Upgrade to Actionscript v2 so Flash Player 7 is now required.<br>
+					Forecast display - if you're using a Davis VP.<br>
+					Solar and UV graphs - if you have the sensors and are showing them.<br>
+					Improved loading routines.<br>
+					Option to combine Windchill and Temp on a graph.<br>
+					Option to show rainrate in inches/hr.
+					<br>
+					Italian language.
+					<br>
+					Improved graphing component<br>
+					New look buttons.
+					<br>
+					New look dropdown menus.
+					<br>
+					Webcam option.</td>
+			</tr>
+			<tr valign="top">
+				<td>v2_05</td>
+				<td>04/10/2004</td>
+				<td>Fixed problem loading clientrawextra.txt file.<br>
+					Added third colour (amber) to records LED. Now red indicates record within last
+					24 hours, amber last 7 days.				</td>
+			</tr>
+			<tr valign="top">
+				<td>v2_04</td>
+				<td>25/09/2004</td>
+				<td>Added W/m<sup>2</sup> option for solar sensor.<br>
+					Added snow fall text options.<br>
+					Added decimal point option for mb or hPa for barometer.<br>
+					Fixed bug with meterHumidity for extra sensors.<br>
+					Added all the extra sensors - now 16 available.<br>
+					Added Beaufort option for wind dials.<br>
+					Added days without rain reading.<br>
+					Added mercury barometer instrument.<br>
+					Fixed tooltip for Barometer when displayed as a VU.<br>
+					Added km/h option for French users.<br>
+					Added Norwegian wind direction settings.<br>
+					Fixed couple of errors in configuring_wdl.pdf.<br>
+					More amendments to German language.</td>
+			</tr>
+			<tr valign="top">
+				<td>v2_03</td>
+				<td>14/09/2004</td>
+				<td><p>Added Norwegian language.<br>
+						Adjusted position and rotation of barometer trend arrow when used on the 'VU'
+						meter.<br>
+						Amendments to German language version.<br>
+						Adjustments to loading of records.</p>				</td>
+			</tr>
+			<tr valign="top">
+				<td>v2_02</td>
+				<td>12/09/2004</td>
+				<td><p>Added tool tip to compass.<br>
+						Added Spanish language.<br>
+						Fixed bug in station name when it had a - in the name.<br>
+						Added 24 hour barometer graph.<br>
+						Added new 24 hour times on graph x axis.
+						<br>
+						Update Weather Display Live hyperlink.<br>
+					</p>				</td>
+			</tr>
+			<tr valign="top">
+				<td>v2_01</td>
+				<td>06/09/2004</td>
+				<td><p>Instruments in WDL can now be configured by use of the WDL configuration file.<br>
+						Changed acceleration of wind instruments to make it more realistic.<br>
+						Multi-lingual.<br>
+						Hyperlinks on objects.<br>
+						Lightning activity.<br>
+						All time records.<br>
+						More graph options.<br>
+						Updated link on Weather Display Live version text.<br>
+					</p>				</td>
+			</tr>
+			<tr valign="top">
+				<td>v1_08</td>
+				<td>30/06/2004</td>
+				<td>Maintenance release - fixed bug with wind scaling.<br>
+					Added version number to WDL link,				</td>
+			</tr>
+			<tr valign="top">
+				<td>v1_07</td>
+				<td>17/06/2004</td>
+				<td>Changed thermometers to have a sliding scale and reduced range to only 50
+					degrees Celsius instead of 65.<br>
+					Added gradient background to UV bar.</td>
+			</tr>
+			<tr valign="top">
+				<td>v1_06</td>
+				<td>14/06/2004</td>
+				<td>Added peak markers to wind average and gust dials.<br>
+					Added option to select date, time or alternating next to station name.				</td>
+			</tr>
+			<tr valign="top">
+				<td>v1_05</td>
+				<td>24/05/2004</td>
+				<td>Large scale rewrite behind the scenes to make it more object oriented - mainly
+					in preparation for v2 and to reduce file size
+					<br>
+					Line wrap sorted for Metars
+					<br>
+					Tooltips added
+					<br>
+					UV sensor added
+					<br>
+					Rainfall gauges animated
+					<br>
+					Heat index/humidex option
+					<br>
+					Ability for users to enable or disable buttons with config file.
+					<br>
+					More icon keywords added
+					<br>
+					Comments taken out of config file and put in readme to reduce file size.</td>
+			</tr>
+			<tr valign="top">
+				<td>v1_04</td>
+				<td>22/4/2004</td>
+				<td><p>Fixed bug causing compass to keep rotating if wind moved anticlockwise to 0
+						degrees.<br>
+						Added 3 new graph options.<br>
+						Added min/max temperatures for Heat Index and Windchill.<br>
+						Added option to display compass heading in degrees and letters.
+						<br>
+						Added display of average and gust wind in figures<br>
+						Changed colour of temperature between 10 and 15 degrees.<br>
+						Added more weather icons.
+						<br>
+						Increased capacity of rain tanks to 10,000mm.
+					</p>				</td>
+			</tr>
+			<tr valign="top">
+				<td>v1_03</td>
+				<td>6/4/2004</td>
+				<td>Re-engineered the way data files load to avoid problems some people were having
+					with webservers not being able to respond quickly enough.				</td>
+			</tr>
+			<tr valign="top">
+				<td>v1_02</td>
+				<td>4/4/2004</td>
+				<td><p>Added switching between date and time next to heartbeat indicator.<br>
+						Corrected problems with rounding,<br>
+						Added min, max temp bars on thermometer.<br>
+						Improved font resizing.<br>
+						Fixed bug which would show serial error instead of error loading configuration
+						file after the 30 second timeout.<br>
+						Added option of displaying wind in kph.<br>
+						Fixed bug with thermometer scale showing celsius at load instead of farenheit
+						if that option had been selected.<br>
+						Changed rain gauge to improve display when in inches.<br>
+						Improved barometer when displaying in inHg.
+					</p>				</td>
+			</tr>
+			<tr valign="top">
+				<td>v1_01</td>
+				<td>30/03/2004</td>
+				<td>Increased size of weather station name field.
+					<br>
+					Increased Barometer display in inHg to 2 decimal places.
+					<br>
+					Added refresh advice to serial number error screen.<br>
+					Fixed bug in serial number routine.				</td>
+			</tr>
+			<tr valign="top">
+				<td>v1_00</td>
+				<td>29/03/2004</td>
+				<td>The first release of Weather Display Live				</td>
+			</tr>
+		</table>
+		<p>&nbsp;</p>
+		<p align="center" class="small">© Julian Best 2008</p>
+	</body>
+</html>

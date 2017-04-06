@@ -1,0 +1,12 @@
+<?php
+/**
+ * @file
+ * Install file for RMetS CPD records.
+ */
+
+/**
+ * Feature update for changes to views.
+ */
+function rmets_cpd_records_update_7108() {
+  features_revert(array('rmets_cpd_records' => array('rmets_cpd_records_features')));
+}

@@ -1,0 +1,81 @@
+<?php
+
+/**
+ * @file
+ * Install, update and requirements function for award_profiles.
+ */
+
+/**
+ * Implements hook_requirements().
+ */
+function award_profiles_requirements($phase) {
+  $requirements = array();
+
+  if ($phase == 'runtime') {
+
+    $date = variable_get('award_profiles_last_sync', t('NEVER'));
+    $requirement = REQUIREMENT_WARNING;
+
+    if ($date === FALSE) {
+      $date = t('Last synchronisation via cron failed. Please check the error logs then run manually to get cron to work again');
+      $requirement = REQUIREMENT_ERROR;
+    }
+    elseif (is_numeric($date)) {
+      if (time() < ($date + 86400)) {
+        $requirement = REQUIREMENT_OK;
+      }
+      $date = date('r', $date);
+    }
+
+    $requirements['award_profiles'] = array(
+      'title' => t('Accreditations and awards'),
+      'value' => t('Last synced on: %date ', array('%date' => $date)),
+      'description' => t('The accreditations and awards are stored in CRM and synchronised overnight. ') . l(t('Synchronise now'), 'admin/reports/status/crm_sync_awards'),
+      'severity' => $requirement,
+    );
+
+  }
+
+  return $requirements;
+}
+
+/**
+ * Removed SQL rewriting on the award profile view.
+ * All awards should be listed regardless of published state to anon.
+ */
+function award_profiles_update_7001() {
+  features_revert(
+    array(
+      'award_profiles' => array(
+        'views_view',
+      ),
+    )
+  );
+}
+
+/**
+ * Added new fields for referencing CRM awards/ accreditations.
+ */
+function award_profiles_update_7002() {
+  features_revert(
+    array(
+      'award_profiles' => array(
+        'field',
+        'views_view',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated the award table view.
+ */
+function award_profiles_update_7003() {
+  features_revert(
+    array(
+      'award_profiles' => array(
+        'views_view',
+      ),
+    )
+  );
+}

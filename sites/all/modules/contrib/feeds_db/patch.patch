@@ -1,0 +1,104 @@
+diff --git a/plugins/DBFetcher.inc b/plugins/DBFetcher.inc
+index 426d480..8e5e267 100644
+--- a/plugins/DBFetcher.inc
++++ b/plugins/DBFetcher.inc
+@@ -30,6 +30,9 @@ class DBFetcher extends FeedsFetcher {
+    */
+   public function fetch(FeedsSource $source) {
+     $source_config = $source->getConfigFor($this);
++    if (empty($source_config)) {
++      $source_config = $this->getConfig();
++    }
+ 
+     // @TODO: Raise exceptions, avoid global meltdown
+ 
+@@ -60,6 +63,13 @@ class DBFetcher extends FeedsFetcher {
+    * Overrides parent:sourceDefaults()
+    */
+   public function sourceDefaults() {
++    return array();
++  }
++
++  /**
++   * Define defaults.
++   */
++  public function configDefaults() {
+     global $databases;
+     $db_names = array();
+     foreach (array_keys($databases) as $db_name) {
+@@ -70,6 +80,7 @@ class DBFetcher extends FeedsFetcher {
+       'database' => current($db_names),
+       'database_query' => '',
+       'limit' => 0,
++      'allow_override' => TRUE,
+     );
+   }
+ 
+@@ -79,6 +90,20 @@ class DBFetcher extends FeedsFetcher {
+   public function sourceForm($source_config) {
+     global $databases;
+     $form = array();
++    $importer = feeds_importer($this->id);
++    $importer_config = $importer->getConfig();
++
++    $config = $this->getConfig();
++    if (empty($source_config) || (!$config['allow_override'] && empty($source_config['config'])) ) {
++      $source_config = $config;
++    }
++
++    if (isset($source_config['allow_override']) &&
++        !$source_config['allow_override'] &&
++        empty($source_config['config'])) {
++      $form['dummy'] = array('#type' => 'hidden', '#value' => 'dummy');
++      return $form;
++    }
+     $db_names = array();
+     foreach (array_keys($databases) as $db_name) {
+       $db_names[$db_name] = $db_name;
+@@ -111,15 +136,42 @@ class DBFetcher extends FeedsFetcher {
+   }
+ 
+   /**
+-   * Override parent::sourceFormValidate().
++   * Override parent::configForm().
++   * Based on code from Feeds XPathParser.
+    */
+-  public function sourceFormValidate(&$values) {
++  public function configForm(&$form_state) {
++    $config = $this->getConfig();
++    $config['config'] = TRUE;
++    $form = $this->sourceForm($config);
++    $form['allow_override'] = array(
++      '#type' => 'checkbox',
++      '#title' => t('Allow source configuration override'),
++      '#default_value' => $config['allow_override'],
++    );
++    return $form;
+   }
+ 
+   /**
+-   * Override parent::sourceSave().
++   * Override parent::sourceFormValidate().
++   *
++   * If the values of this source are the same as the base config we set them to
++   * blank to that the values will be inherited from the importer defaults.
++   *
++   * @param &$values
++   *   The values from the form to validate, passed by reference.
+    */
+-  public function sourceSave(FeedsSource $source) {
++  public function sourceFormValidate(&$values) {
++    $config = $this->getConfig();
++    $allow_override = $config['allow_override'];
++    unset($config['allow_override']);
++    ksort($values);
++    ksort($config);
++    if ($values === $config || !$allow_override) {
++      $values = array();
++      return;
++    }
++
++    $this->configFormValidate($values);
+   }
+ 
+   /**

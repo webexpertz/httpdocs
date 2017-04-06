@@ -1,0 +1,63 @@
+<?php
+
+/**
+ * @file
+ * Installation file for Scheduler module.
+ */
+
+/**
+ * Implements hook_schema().
+ */
+function responsible_person_schema() {
+  return array(
+    'responsible_person' => array(
+      'description' => 'The main table to hold the schedule review data.',
+      'fields' => array(
+        'nid' => array(
+          'description' => 'The foreign key to node.nid',
+          'type' => 'int',
+          'unsigned' => TRUE,
+          'not null' => TRUE,
+        ),
+        'uid' => array(
+          'description' => 'The UNIX UTC timestamp when to notify',
+          'type' => 'int',
+          'unsigned' => TRUE,
+          'not null' => TRUE,
+          'default' => 0,
+        ),
+      ),
+      'primary key' => array('nid'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function responsible_person_uninstall() {
+  /*
+  $variables = array(
+    'scheduler_date_format',
+    'scheduler_field_type',
+    'scheduler_extra_info',
+  );
+
+  $types = node_type_get_types();
+  foreach ($types as $type) {
+    $type_name = $type->type;
+    $variables[] = "scheduler_publish_enable_" . $type_name;
+    $variables[] = "scheduler_publish_touch_" . $type_name;
+    $variables[] = "scheduler_publish_required_" . $type_name;
+    $variables[] = "scheduler_publish_revision_" . $type_name;
+    $variables[] = "scheduler_unpublish_enable_" . $type_name;
+    $variables[] = "scheduler_unpublish_required_" . $type_name;
+    $variables[] = "scheduler_unpublish_revision_" . $type_name;
+  }
+
+  foreach ($variables as $variable) {
+    variable_del($variable);
+  }
+  */
+}
+

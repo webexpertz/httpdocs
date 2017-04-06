@@ -1,0 +1,5 @@
+name = Schedule Review
+description = 
+package = RMetS
+version = VERSION
+core = 7.x

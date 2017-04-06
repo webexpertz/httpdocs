@@ -1,0 +1,277 @@
+<?php
+
+/**
+ * Implements hook_form_node_type_form_alter().
+ */
+function responsible_person_form_node_type_form_alter(&$form, $form_state) {
+  drupal_add_css(drupal_get_path('module', 'scheduler') .'/scheduler.css');
+  $form['responsible_person'] = array(
+    '#type' => 'fieldset',
+    '#title' => 'Responsible person settings',
+    '#weight' => 35,
+    '#group' => 'additional_settings',
+    '#attached' => array(
+      'js' => array(
+        'vertical-tabs' => drupal_get_path('module', 'responsible_person') . "/responsible_person_vertical_tabs.js"
+      ),
+    ),
+  );
+  $form['responsible_person']['rp'] = array(
+      '#type' => 'fieldset',
+      '#title' => NULL,
+      '#collapsible' => FALSE,
+      '#collapsed' => FALSE,
+      '#weight' => 1,
+      '#group' => 'responsible_person',
+  );
+
+  $form['responsible_person']['rp']['responsible_person_enable'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Enable Responsible Person'),
+      '#default_value' => variable_get('responsible_person_enable_' . $form['#node_type']->type, 0),
+      '#description' => t('Check this box to enable scheduled publishing for this node type.')
+  );
+}
+
+/**
+ * Implementation of hook_form_alter().
+ */
+function responsible_person_form_alter(&$form, $form_state) {
+  // Is this a node form and scheduling has been enabled for this node type
+  if (!empty($form['#node_edit_form']) && user_access('schedule (un)publishing of nodes')) {
+    $rp_enabled = variable_get('responsible_person_enable_'. $form['type']['#value'], 0) == 1;
+
+    // if a responsible_person has been enabled for this node type
+    if ($rp_enabled) {
+
+      $node = $form['#node'];
+
+      $date_format = variable_get('scheduler_date_format', SCHEDULER_DATE_FORMAT);
+      $use_date_popup = _scheduler_use_date_popup();
+
+      $internal_date_format = $use_date_popup ? SCHEDULER_DATE_FORMAT : $date_format;
+
+      // if this is a preview then get the values from the form, not the db
+      if (isset($form_state['values']['op']) && $form_state['values']['op'] == t('Preview')) {
+        $defaults = new StdClass;
+        $defaults->rp_uid = $publishing_enabled ? $form_state['values']['rp_uid'] : NULL;
+      }
+      elseif (isset($node->nid) && $node->nid > 0) {
+        // Load the values from the db if we are viewing an existing node.
+        $query = db_select('responsible_person', 's');
+        $query->fields('s', array('uid'));
+        $query->condition('s.nid', $node->nid, '=');
+        $defaults = $query->execute()->fetchObject();
+        if (isset($defaults->uid) && is_numeric($defaults->uid)) {
+          $defaults->rp_uid = user_load($defaults->uid)->name;
+        }
+      }
+      else {
+        // init standard values
+        $defaults = new StdClass;
+        $defaults->rp_uid = NULL;
+      }
+
+      // if there is a text value then convert it to a unix timestamp
+      //if (isset($defaults->rp_uid) && $defaults->rp_uid && !is_numeric($defaults->rp_uid)) {
+      //  $defaults->rp_uid = _scheduler_strtotime($defaults->rp_uid);
+      //}
+
+      $publishing_required = variable_get('scheduler_publish_required_'. $form['type']['#value'], 0) == 1;
+      $unpublishing_required = variable_get('scheduler_unpublish_required_'. $form['type']['#value'], 0) == 1;
+
+      $fieldset_extended = (
+        (isset($defaults->rp_uid) && $defaults->rp_uid != 0)
+        || $publishing_required
+        || $unpublishing_required
+      );
+
+      $form['responsible_person_settings'] = array(
+        '#type' => 'fieldset',
+        '#title' => t('Responsible person'),
+        '#collapsible' => TRUE,
+        '#collapsed' => !$fieldset_extended,
+        '#weight' => 35,
+        '#group' => 'additional_settings',
+        '#attached' => array(
+          'js' => array(
+            'vertical-tabs' => drupal_get_path('module', 'responsible_person') . "/responsible_person_vertical_tabs.js"
+          ),
+        )
+      );
+
+      $extra_info = variable_get('scheduler_extra_info', '');
+      if ($extra_info && $extra_info != '') {
+        $form['scheduler_settings']['extra_info'] = array(
+          '#type' => 'item',
+          '#markup' => $extra_info,
+        );
+      }
+
+      $description_format = t('Enter the username of the responsible person.');
+      if ($rp_enabled) {
+        $description_blank = '';
+        if (!$publishing_required) {
+          $description_blank .= ' '.t('You may leave this blank if you wish.');
+        }
+
+        $form['responsible_person_settings']['rp_uid'] = array(
+          '#type' => 'textfield',
+          '#title' => t('Responsible person'),
+          '#maxlength' => 25,
+          '#required' => $publishing_required,
+          '#default_value' => isset($defaults->rp_uid) && $defaults->rp_uid ? $defaults->rp_uid : '',
+          '#description' => $description_format.$description_blank,
+          '#autocomplete_path' => 'user/responsible_person/autocomplete',
+        );
+      }
+    }
+  }
+}
+
+
+/**
+ * Implements hook_node_load().
+ */
+function responsible_person_node_load($nodes, $types) {
+  $nids = array_keys($nodes);
+  $result = db_query('SELECT * FROM {responsible_person} WHERE nid IN (:nids)', array(':nids' => $nids));
+  foreach ($result as $record) {
+    $nid = $record->nid;
+    $nodes[$nid]->rp_uid = user_load($record->uid)->name;
+    /*
+    @TODO this
+    $row = array();
+    $row['published'] = $record->publish_on ? date(variable_get('date_format_long', 'l, F j, Y - H:i'), $record->publish_on) : NULL;
+    $row['unpublished'] = $record->unpublish_on ? date(variable_get('date_format_long', 'l, F j, Y - H:i'), $record->unpublish_on) : NULL;
+    $row['publish_on'] = $record->publish_on;
+    $row['unpublish_on'] = $record->unpublish_on;
+    $nodes[$nid]->scheduler = $row;
+    */
+  }
+}
+
+function responsible_person_node_validate($node, $form) {
+  // adjust the entered times for timezone consideration.
+  // Note, we must check to see if the value is numeric,
+  // if it is, assume we have already done the strtotime
+  // conversion. This prevents us running strtotime on
+  // a value we have already converted. This is needed
+  // because DRUPAL6 removed 'submit' and added 'presave'
+  // and all this happens at different times.
+  /*
+  $date_format = variable_get('scheduler_date_format', SCHEDULER_DATE_FORMAT);
+
+  if (!empty($node->rp_uid) && !is_numeric($node->rp_uid)) {
+    $publishtime = _scheduler_strtotime($node->rp_uid);
+    if ($publishtime === FALSE) {
+      form_set_error('rp_uid', t("The 'publish on' value does not match the expected format of %time", array('%time' => format_date(REQUEST_TIME, 'custom', $date_format))));
+    }
+    elseif ($publishtime && $publishtime < REQUEST_TIME) {
+      form_set_error('rp_uid', t("The 'publish on' date must be in the future"));
+    }
+  }
+  if (!empty($node->review_email) && !valid_email_address($node->review_email)) {
+    form_set_error('review_email', 'email address not recognized');
+  }
+  */
+
+}
+
+function responsible_person_node_presave($node) {
+  foreach (array('rp_uid') as $key) {
+    if (empty($node->$key)) {
+    // Make sure rp_uid and unrp_uid are not empty strings.
+      $node->$key = 0;
+    }
+    elseif (!is_numeric($node->$key)) {
+      $u = user_load_by_name($node->$key);
+      $node->$key= $u->uid;
+    }
+  }
+  // Right before we save the node, we need to check if a "publish on" value has been set.
+  // If it has been set, we want to make sure the node is unpublished since it will be published at a later date
+  /* @TODO This
+  if (isset($node->rp_uid) && $node->rp_uid != '' && is_numeric($node->rp_uid) && $node->rp_uid > REQUEST_TIME) {
+    $node->status = 0;
+    $date_format = variable_get('scheduler_date_format', SCHEDULER_DATE_FORMAT);
+    drupal_set_message(t('This post is unpublished and will be published @publish_time.', array('@publish_time' => format_date($node->rp_uid, 'custom', $date_format))), 'status', FALSE);
+  }
+  */
+}
+
+function responsible_person_node_insert($node) {
+  // only insert into database if we need to (un)publish this node at some date
+  if (!empty($node->rp_uid)) {
+    db_insert('responsible_person')
+      ->fields(array(
+        'nid' => $node->nid,
+        'uid' => $node->rp_uid,
+      ))
+      ->execute();
+  }
+}
+
+function responsible_person_node_update($node) {
+  // only update database if we need to (un)publish this node at some date
+  // otherwise the user probably cleared out the (un)publish dates so we should remove the record
+  if (!empty($node->rp_uid)) {
+    db_merge('responsible_person')
+      ->key(array('nid' => $node->nid))
+      ->fields(array(
+          'uid' => $node->rp_uid,
+        ))
+      ->execute();
+  }
+  else {
+    responsible_person_node_delete($node);
+  }
+}
+
+function responsible_person_node_delete($node) {
+  db_delete('responsible_person')
+    ->condition('nid', $node->nid)
+    ->execute();
+}
+
+/**
+ * Menu callback; Retrieve a JSON object containing autocomplete suggestions for existing users.
+ */
+function responsible_person_user_autocomplete($string = '') {
+  $matches = array();
+  if ($string) {
+    $query = db_select('users', 'u');
+    $query->join('users_roles', 'r', 'u.uid = r.uid'); // JOIN users with users_roles
+    $query->fields('u',array('uid','name')); // SELECT the fields from users
+    $query->fields('r',array('rid')); // SELECT the fields from users_roles
+    $query->condition('r.rid', 5, '='); // WHERE role is 3
+    $result = $query->execute();
+    foreach ($result as $user) {
+      $matches[$user->name] = check_plain($user->name);
+    }
+  }
+
+  drupal_json_output($matches);
+}
+
+/**
+ * Implements hook_menu().
+ */
+function responsible_person_menu() {
+  $items['user/responsible_person/autocomplete'] = array(
+    'title' => 'User autocomplete',
+    'page callback' => 'responsible_person_user_autocomplete',
+    'access callback' => 'user_access',
+    'access arguments' => array('access user profiles'),
+    'type' => MENU_CALLBACK,
+  );
+  return $items; 
+}
+
+/**
+ * Implementation of "contrib module views" hook_views_tables()
+ */
+function responsible_person_views_api() {
+  $info['api'] = 2;
+  return $info;
+}

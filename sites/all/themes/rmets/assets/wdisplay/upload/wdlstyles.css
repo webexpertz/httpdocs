@@ -1,0 +1,100 @@
+.cloudBase{
+	color:#990000;
+}
+.cloudBaseScale{
+	color: #990000;
+}
+.barometer{
+	color:#990000;
+}
+.barometerScale{
+	color: #990000;
+}
+.compass{
+	color:#990000;
+}
+.compassScale{
+	color: #990000;
+}
+.conditions{
+	color:#990000;
+}
+.forecast{
+	color: #990000;
+}
+.fwi{
+	color:#990000;
+}
+.fwiScale{
+	color: #990000;
+}
+.leafWetness{
+	color:#990000;
+}
+.weatherStationName{
+	color:#990000;
+}
+.rainfall{
+	color:#990000;	
+}
+.rain{
+	color:#990000;	
+}
+.rainRate{
+	color:#990000;	
+}
+.rainScale{
+	color: #990000;	
+}
+.solar{
+	color:#990000;
+}
+.solarScale{
+	color: #990000;
+}
+.sunMoon{
+	color:#990000;
+}
+.temperature{
+	color:#990000
+}
+.temperatureScale{
+	color: #990000;
+}
+.windchill{
+	color:#990000
+}
+.snow{
+	color:#990000;
+}
+.evapoTranspiration{
+	color:#990000;
+}
+.soilMoisture{
+	color:#990000;
+}
+.beaufort{
+	color:#990000;
+}
+.beaufortScale{
+	color: #990000;
+}
+.uv{
+	color:#990000;
+}
+.humidity{
+	color:#990000;
+}
+.humidityScale{
+	color: #990000;
+}
+.wind{
+	color:#990000;
+}
+.windScale{
+	color: #990000;
+}
+/* This class is not available in the Greek language version */
+.buttons{
+	color:#990000;
+}

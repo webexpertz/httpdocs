@@ -1,0 +1,7 @@
+<?php
+/**
+ * @file
+ * Code for the rmets_news feature.
+ */
+
+include_once 'rmets_news.features.inc';

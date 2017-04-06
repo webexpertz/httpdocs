@@ -1,0 +1,806 @@
+<?php
+/**
+ * @file
+ */
+
+include_once 'rmets_system.features.inc';
+
+use Drupal\rmets_membership_user\EntityWrapper\User\UserWrapper;
+
+/**
+ * Implements hook_init().
+ */
+function rmets_system_init() {
+  global $user;
+
+  // On certain pages we don't want admin menu to appear (if it's thinking about it).
+  if ($user->uid && isset($_GET['ajax'])) {
+    admin_menu_suppress();
+  }
+
+  // Add some text to the shop pages.
+  $path_alias = drupal_get_path_alias();
+  $path = explode('/', $path_alias);
+  if (is_array($path) && in_array($path[0], array('shop', 'cart', 'checkout')) && !drupal_is_cli()) {
+    drupal_set_message(t('To avoid delays and to ensure the correct postage fees, please ensure that you select the correct postage options for the delivery address.<br />
+To benefit from members\' rates you will need to ensure that you are logged in. <br />
+The society reserves the right to contact you if you have paid the incorrect postage charges.'), 'status', FALSE);
+  }
+}
+
+/**
+ * Implements hook_menu().
+ */
+function rmets_system_menu() {
+  $items = array();
+
+  $items['wiley-backissues/%'] = array(
+    'page title' => 'Wiley Backissues',
+    'page callback' => 'rmets_system_wiley_backissue_redirect',
+    'page arguments' => array(1),
+    'access arguments' => array('access wiley backissues'),
+  );
+
+  return $items;
+}
+
+/**
+ * Implements hook_permission().
+ */
+function rmets_system_permission() {
+  return array(
+    'access wiley backissues' => array(
+      'title' => t('Access the Wiley backissues'),
+      'description' => t('Allows access to the Wiley backissues redirect.'),
+    ),
+  );
+}
+
+/**
+ * Menu page callback.
+ * Redirect to Wiley backissue.
+ */
+function rmets_system_wiley_backissue_redirect($journal_id) {
+
+  $journal_code = FALSE;
+  if (is_numeric($journal_id)) {
+    $term = taxonomy_term_load($journal_id);
+    if (!empty($term->field_journal_code)) {
+      $journal_code = entity_metadata_wrapper('taxonomy_term', $term)->field_journal_code->value();
+    }
+  }
+
+  if (!empty($journal_code)) {
+
+    $ticketurl = "http://onlinelibrary.wiley.com/login-proxy-tps?targetURL=http://onlinelibrary.wiley.com/resolve/doi?DOI={$journal_code}&domain=www.rmets.org";
+    $fp = @fopen($ticketurl, 'r');
+    if ($fp) {
+      $url = $fp ? fread($fp, 1000000) : FALSE;
+      fclose($fp);
+      if ($url) {
+        drupal_goto($url);
+      }
+    }
+  }
+
+  drupal_not_found();
+  exit;
+}
+
+/**
+ * Implements hook_mail_alter().
+ */
+function rmets_system_mail_alter(&$message) {
+  // We match the spam trap values and replace with the real values.
+  if ($message['id'] == 'webform_submission') {
+    if (preg_match('/example.com$/', $message['to'])) {
+      // @TODO what are the real values?
+      $message['to'] = preg_replace('/example.com$/', 'rmets.org', $message['to']);
+    }
+  }
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function rmets_system_form_apachesolr_search_custom_page_search_form_alter(&$form, &$form_state, $form_id) {
+  $form['basic']['#attributes']['class'] = array('inline-search beige-block block');
+  if (arg(1) == 'image-gallery'):
+    $form['basic']['keys']['#title'] = 'Search images';
+  elseif (arg(0) == 'events'):
+    $form['basic']['keys']['#title'] = 'Search events';
+  endif;
+  $form['basic']['keys']['#noprefix'] = TRUE;
+  $form['basic']['submit']['#value'] = 'Go';
+}
+
+/**
+ * Implements hook_form_alter().
+ */
+function rmets_system_form_alter(&$form, &$form_state, $form_id) {
+  if (stripos($form_id, 'webform_client_form_') !== FALSE) {
+    _rmets_system_add_logged_in_user_details_to_webform($form);
+  }
+  // Allow a larger number of values for fields.
+  if ($form_id == 'field_ui_field_edit_form') {
+    $form['field']['cardinality']['#options'] = array(FIELD_CARDINALITY_UNLIMITED => t('Unlimited')) + drupal_map_assoc(range(1, 30));
+  }
+}
+
+/**
+ * Tmplements hook_form_FORM_ID_alter().
+ * Make the event type box bigger. This is on the admin theme which
+ * is core so change the style here.
+ */
+function rmets_system_form_event_node_form_alter(&$form, &$form_state, $form_id) {
+  if (!empty($form['field_event_type'])) {
+    $form['field_event_type'][LANGUAGE_NONE]['#attributes']['style'] = 'width: 500px; height: 250px';
+  }
+}
+
+/**
+ * Implements hook_form_BASE_FORM_ID_alter().
+ * Hides the Abstract materials field from this form.
+ */
+function rmets_system_form_event_abstract_node_form_alter(&$form, &$form_state, $form_id) {
+  $form['field_grouped_files']['#access'] = FALSE;
+}
+
+
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function rmets_system_form_views_form_commerce_cart_form_default_alter(&$form, &$form_state, $form_id) {
+  $form['actions']['continue_shopping'] = array(
+    '#markup' => '<a class="button" href="/shop">Continue shopping</a>',
+    '#weight' => -10,
+  );
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ * Set the title on the password reset page as password reset is
+ * a silly title when a user is setting their password for the
+ * first time.
+ */
+function rmets_system_form_user_pass_reset_alter(&$form, &$form_state, $form_id) {
+  drupal_set_title(t('Setup your account'));
+  $account = user_load($form_state['build_info']['args'][0]);
+  $timestamp = $form_state['build_info']['args'][1];
+  $timeout = 86400;
+  $form['message'] = array('#markup' => t('<p>This is a one-time login for %user_name and will expire on %expiration_date.</p><p>Click on this button to log in to the site and create your password (new users) or reset your password (existing users).</p>', array('%user_name' => $account->name, '%expiration_date' => format_date($timestamp + $timeout))));
+}
+
+/**
+ * Helper function, given a webform, add the logged in
+ * user's details to any specific fields. Note here that
+ * capital letters are important.
+ */
+function _rmets_system_add_logged_in_user_details_to_webform(&$form) {
+  if (user_is_logged_in()) {
+    global $user;
+    $wrapper = new UserWrapper(user_load($user->uid));
+
+    foreach (element_children($form) as $key) {
+      switch ($key) {
+        case 'Forenames':
+          $form[$key]['#default_value'] = $wrapper->getForename();
+          break;
+        case 'Surname':
+          $form[$key]['#default_value'] = $wrapper->getSurname();
+          break;
+        case 'Address1':
+          if ($wrapper->getAddress1()) {
+            $form[$key]['#default_value'] = $wrapper->getAddress1();
+          }
+          break;
+        case 'Address2':
+          if ($wrapper->getAddress2()) {
+            $form[$key]['#default_value'] = $wrapper->getAddress2();
+          }
+          break;
+        case 'Town':
+          if ($wrapper->getCity()) {
+            $form[$key]['#default_value'] = $wrapper->getCity();
+          }
+          break;
+        case 'County':
+          if ($wrapper->getStateProvince()) {
+            $form[$key]['#default_value'] = $wrapper->getStateProvince();
+          }
+          break;
+        case 'PostCode':
+          if ($wrapper->getPostCode()) {
+            $form[$key]['#default_value'] = $wrapper->getPostCode();
+          }
+          break;
+        case 'Country':
+          if ($wrapper->getCountry()) {
+            $form[$key]['#default_value'] = $wrapper->getCountry();
+          }
+          break;
+        default :
+          // Recursively look at child arrays.
+          _rmets_system_add_logged_in_user_details_to_webform($form[$key]);
+      }
+    }
+  }
+}
+
+/**
+ * Implements hook_element_info_alter().
+ */
+function rmets_system_element_info_alter(&$type) {
+  if (isset($type['link_field'])) {
+    $type['link_field']['#process'][] = 'rmets_system_link_field_process';
+  }
+}
+
+/**
+ * Helper function, process a link field.
+ */
+function rmets_system_link_field_process($element, $form_state, $complete_form) {
+  switch ($element['#field_name']) {
+    case 'field_resources_link':
+      $element['title']['#title'] = t('Website title');
+      $element['url']['#title'] = t('Website url');
+      $element['attributes']['title']['#maxlength'] = 255;
+      $element['attributes']['title']['#title'] = 'Description';
+      unset($element['attributes']['title']['#field_prefix']);
+      unset($element['attributes']['title']['#field_suffix']);
+
+      break;
+  }
+
+  return $element;
+}
+
+/**
+ * Implements hook_preprocess_html().
+ */
+function rmets_system_preprocess_html(&$variables) {
+  // Determine if the current page is part of the ACCSYS system.
+  // Check the current page URL.
+  $isAccsysPage = FALSE;
+  $path = current_path();
+  if (strstr($path, 'cpd') !== FALSE) {
+    $isAccsysPage = TRUE;
+  }
+
+  // If editing a node, check the node type.
+  if (!$isAccsysPage) {
+    if (isset($variables['page']['content']['system_main']['type']['#value']) &&
+      in_array($variables['page']['content']['system_main']['type']['#value'], array('cpd_objective', 'cpd_record', 'cpd_report_review', 'cpd_accreditation_application'))) {
+      $isAccsysPage = TRUE;
+    }
+  }
+
+  if ($isAccsysPage) {
+    $variables['isAccsysPage'] = "
+<script type='text/javascript'>var fc_JS=document.createElement('script');fc_JS.type='text/javascript';fc_JS.src='https://assets1.freshchat.io/production/assets/widget.js?t='+Date.now();(document.body?document.body:document.getElementsByTagName('head')[0]).appendChild(fc_JS); window._fcWidgetCode='yoD9kpbJ';window._fcURL='https://rmets.freshchat.io';</script>
+";
+  }
+}
+
+/**
+ * Implements hook_page_alter().
+ */
+function rmets_system_page_alter(&$page) {
+  // If the block search contains content we want drupal to act as if
+  // sidebar-first has some content. Insert some junk.
+  if (isset($page['search']) && count($page['search'])) {
+    $page['sidebar_first']['foo'] = 'bar';
+  }
+
+  // Remove blocks on access denied pages.
+  if (isset($page['#logintoboggan_denied'])) {
+    global $base_url;
+    $page['content']['system_main']['new_web_message']['#markup'] = '<p class="padded messages warning">' . t('You will need to log in to access this page. In most cases our protected pages are accessible to all users after registration, although certain pages with member benefits are only available to members of the Society (online journals etc.). To register visit ') . l(t($base_url . '/user/register'), 'user/register', array('query' => drupal_get_destination())) . '</p>';
+  }
+}
+
+/**
+ * Helper function. Determine if the current
+ * path is an image-gallery page.
+ */
+function rmets_system_is_image_gallery() {
+  return (arg(0) == 'image-gallery') ? TRUE : FALSE;
+}
+
+/**
+ * Implements hook_block_BLOCK_ID_alter().
+ */
+function rmets_system_block_view_menu_block_1_alter(&$data, $block) {
+  //debug($data);
+  //$data['title_attributes_array']['class'] = 'head';
+}
+
+/**
+ * Implements hook_node_view().
+ */
+function rmets_system_node_view($node, $view_mode, $langcode) {
+  if ($node->type == 'landing_page') {
+    $nodes = array();
+    $landing_entity = entity_metadata_wrapper('node', $node);
+    $nodes = isset($landing_entity->field_landing_page_nodes) ? $landing_entity->field_landing_page_nodes->value() : array();
+    $c_data = '<ul class="sections clearfix">';
+    /*
+    if (!count($nodes)) {
+      $config = menu_block_get_config(1);
+      $data = menu_tree_build($config);
+
+      foreach ($data['content']['#content'] as $mid => $c) {
+        if (isset($c['#href']) && $c['#href'] && preg_match('/^node\/([0-9]+)/', $c['#href'], $matches)) {
+          if (is_numeric($matches[1])) {
+            $nodes[] = node_load($matches[1]);
+          }
+        }
+      }
+    }
+    */
+
+    foreach ($nodes AS $id => $n) {
+      $object = entity_metadata_wrapper('node', $n);
+      $img = isset($object->field_image) ? $object->field_image->value() : array();
+      $img_url = (isset($img['uri'])) ? $img['uri'] : '';
+      $c_data .= '<li>';
+      $c_data .= '<h2>' . check_plain($n->title) . '</h2>';
+      $c_data .= '<div class="image-wrapper rounded">';
+      // The orig image uri.
+      // Any other custom image style you've created
+      // via /admin/config/media/image-styles.
+      $style = '210-137';
+      if (!empty($img_url)) {
+        $c_data .= '<img src="' . image_style_url($style, $img_url) . '" />';
+      }
+      $c_data .= '</div>';
+      $tease = isset($object->field_landing_page_teaser) ? $object->field_landing_page_teaser->value() : '';
+      $c_data .= '<div class="teaser">' . $tease . '</div>';
+      $c_data .= '<a class="highlight arrow-right" href="' . url('node/' . $n->nid) . '">' . $n->title . '</a>';
+
+      $c_data .= '</li>';
+    }
+    $c_data .= '</ul>';
+    $node->content['my_additional_field'] = array(
+      '#markup' => $c_data,
+      '#weight' => 2.5,
+    );
+  }
+  if (isset($node->content['field_resources_link'])) {
+    // Here be hacks...
+    if (count($node->content['field_grouped_files']['#items'])) {
+      unset($node->content['field_resources_link']);
+    }
+    else {
+      $out =
+        '<div class="downloads beige-block block resources">
+           <h2>Resources</h2>';
+      if (isset($node->field_resources_link) && count($node->field_resources_link)) {
+        $out .= '<h3>External links</h3>';
+        $resources = field_view_field('node', $node, 'field_resources_link');
+        $out .= '<ul class="external-link-list">';
+        foreach ($resources AS $id => $resource) {
+          if (is_numeric($id) && isset($resource['#markup'])) {
+            $out .= '<li>' . $resource['#markup'] . '</li>';
+          }
+        }
+        $out .= '</ul>';
+      }
+      $out .= '</div>';
+      $node->content['field_resources_link'] = array('#markup' => $out, '#weight' => 100);
+    }
+  }
+  if ($node->type == 'local_area_groups' || $node->type == 'special_interest_groups') {
+    $node->content['field_contact_name'][0]['#markup'] = 'Contact: <a href="mailto:' . $node->field_contact_email['und'][0]['safe_value'] . '">' . $node->content['field_contact_name'][0]['#markup'] . '</a>';
+    $node->content['group_meetings_view'] = array(
+      '#markup' => '
+        <div class="upcoming meetings block">
+          <h2>Upcoming meetings</h2>'
+          . views_embed_view('events_and_meetings', 'block_2') .
+          '<a class="link blue-arrow past-meetings button-link-small" href="/events/past-meetings/?f[0]=im_field_event_type%3A' . check_plain($node->field_event_type['und'][0]['tid']) . '">Past Meetings</a>
+        </div>',
+      '#weight' => 2.5
+    );
+    $node->content['register_interest'] = array(
+      '#markup' => '<a href="mailto:' . $node->field_contact_email['und'][0]['safe_value'] . '" class="button-link orange right">Register an interest</a>',
+      '#weight' => -10
+    );
+  }
+  if ($node->type == 'image_gallery') {
+    $n = entity_metadata_wrapper('node', $node);
+    $copyright = '';
+    if ($n->field_copyright->value() == 'retain') {
+      if ($n->field_photographer->value()) {
+        $copyright .= '&copy; ' .  $n->field_photographer->value();
+      }
+    }
+    else if ($n->field_copyright->value() == 'rmets') {
+      $copyright .= '&copy RMetS';
+    }
+/*
+    if ($d = $n->field_image_date->value()) {
+      $copyright .= ' ' . date('Y', $d);
+    }
+*/
+    if ($copyright) {
+      $node->content['field_copyright'][0]['#markup'] = $copyright;
+    }
+    else {
+      unset($node->content['field_copyright']);
+    }
+  }
+}
+
+/**
+ * Implements hook_field_extra_fields().
+ */
+function rmets_system_field_extra_fields() {
+  $extra['node']['webform_product']['display'] = array(
+    'rmets_system_webform_default_price' => array(
+      'label' => t('Default webform price'),
+      'description' => t('If this webform has any productfield elements this will show the price.'),
+      'weight' => 5,
+    ),
+  );
+
+  return $extra;
+}
+
+
+/**
+ * Implements hook_field_formatter_info().
+ */
+function rmets_system_field_formatter_info() {
+  return array(
+    'rmets_system_weather_type' => array(
+      'label' => t('RMetS System - Term reference'),
+      'field types' => array('taxonomy_term_reference'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_field_formatter_view().
+ */
+function rmets_system_field_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display) {
+  $element = array();
+
+  if ($display['type'] == 'rmets_system_weather_type') {
+    $types = array();
+    foreach ($items as $item) {
+      $type = taxonomy_term_load($item['tid']);
+      $ref = l($type->name, 'weather-and-climate/image-gallery/search', array('query' => array('f[0]' => 'im_field_weather_type:' . $item['tid'])));
+      $types[] = $ref;
+    }
+
+    $attributes = array();
+    $attributes['class'] = (count($types) > 1 ? array('many') : array('single'));
+
+    $element[0] = array(
+      '#markup' => (!empty($types) ? implode(' ', $types) : FALSE),//theme('item_list', array('items' => $types, 'attributes' => $attributes)) : FALSE),
+    );
+  }
+  return $element;
+}
+
+/**
+ * Implements hook_entity_view().
+ */
+function rmets_system_entity_view($node, $type, $view_mode, $langcode) {
+  $submissions = array();
+  if ($type == 'node' && $node->type == 'webform_product') {
+    $node->content['rmets_system_webform_default_price'] = array(
+      '#theme' => 'webform_product_price',
+      '#node' => $node,
+      '#view_mode' => $view_mode,
+    );
+  }
+}
+
+/**
+ * Theme function
+ * The default price of a webform product.
+ */
+function theme_webform_product_price($vars) {
+  $node = $vars['node'];
+  $price = commerce_webform_calculate_total_default_price_of_webform($node);
+  return '<div class="price">' . commerce_currency_format($price, 'GBP') . '</div>';
+}
+
+/**
+ * Implements hook_theme().
+ */
+function rmets_system_theme() {
+  return array(
+    'webform_product_price' => array(
+      'variables' => array('node' => NULL, 'view_mode' => NULL),
+     ),
+  );
+}
+
+/**
+ * Implements hook_menu_alter().
+ * Remove the user view tab.
+ */
+function rmets_system_menu_alter(&$items) {
+  $items["user/%user/view"]['access callback'] = FALSE;
+}
+
+/**
+ * Get the http or https protocol for urls
+ * @return
+ *    STRING - 'https' or 'http'
+ */
+function rmets_system_get_protocol() {
+  return isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';
+}
+
+/**
+ * Implements hook_features_export_alter().
+ *
+ * Alter the final export array just prior to the rendering of
+ * defaults.
+ * FORBID the hook_views_api, we are going to add that ourself.
+ *
+ * @param array &$export
+ *   By reference. An array of all components to be exported with a given
+ *   feature.
+ * @param array $module_name
+ *   The name of the feature module to be generated.
+ */
+function rmets_system_features_export_alter(&$export, $module_name) {
+  if ($module_name == 'rmets_system') {
+    if (!empty($export['dependencies']['devel'])) {
+      unset($export['dependencies']['devel']);
+    }
+    if (!empty($export['dependencies']['simpletest'])) {
+      unset($export['dependencies']['simpletest']);
+    }
+  }
+}
+
+/**
+ * Implements hook_apachesolr_query_prepare
+ */
+function rmets_system_apachesolr_query_prepare(&$query) {
+  if (arg(0) == 'events') {
+    $query->setAvailableSort('ds_event_date', array(
+      // how the sort link is to appear in the sorts block
+      'title' => t('Event date'),
+      'default' => 'asc', // or 'desc'
+    ));
+  }
+}
+
+/**
+ * Implements hook_apachesolr_query_alter
+ */
+function rmets_system_apachesolr_query_alter($query) {
+  $startoftoday = date('Y-m-d\TH:i:s\Z', mktime(0, 0, 0));
+  $today = date('Y-m-d\TH:i:s\Z', mktime(23, 59, 59));
+  if (arg(0) == 'events' && arg(1) == 'forthcoming-meetings') {
+    // Filter out events from the past.
+    $query->addFilter("dm_field_event_date", '[' . $startoftoday . ' TO 3000-01-01T00:00:00Z]');
+    $query->setSolrsort("ds_event_date", 'asc');
+  }
+  elseif (arg(0) == 'events' && arg(1) == 'past-meetings') {
+    $query->addFilter("dm_field_event_date", '[1800-00-00T00:00:00Z TO ' . $today . ']');
+    $query->setSolrsort("ds_event_date", 'desc');
+  }
+}
+
+/**
+ * Implements hook_apachesolr_index_document_build
+ * we need to add a sort field for date otherwise it complains about multivalued fields
+ */
+function rmets_system_apachesolr_index_document_build(ApacheSolrDocument $document, $entity) {
+  $field = $document->getField('dm_field_event_date');
+  if ($field) {
+    $document->addField('ds_event_date', $field['value'][0]);
+  }
+}
+
+/**
+ * Implements hook_menu_block_tree_alter().
+ * When the menu block is created, rebuild the menu depending on
+ * the current contexts.
+ */
+function rmets_system_menu_block_tree_alter(&$tree, $config) {
+  if (context_isset('context', 'image_gallery')) {
+    // We want the left hand menu to appear on image gallery
+    // submissions
+    $q = $_GET['q'];
+    menu_set_active_item(drupal_get_normal_path('weather-and-climate/image-gallery/search'));
+    $tree = menu_tree_page_data('main-menu');
+    $_GET['q'] = $q;
+  }
+  elseif (context_isset('context', 'corporate_members')) {
+    // We want the left hand menu to appear.
+    $q = $_GET['q'];
+    menu_set_active_item(drupal_get_normal_path('membership/corporate-members'));
+    $tree = menu_tree_page_data('main-menu');
+    $_GET['q'] = $q;
+  }
+}
+
+/**
+ * Implements hook_field_access().
+ * Disable view fields unless a variable is set to TRUE.
+ * You will probably need to up your php memory limit as well
+ * as editing a node with a viewfield on it eats all your memory
+ * and your children.
+ */
+function rmets_system_field_access($op, $field, $entity_type, $entity, $account) {
+  if ($field['field_name'] == 'field_embed_view' && $op == 'edit') {
+    if (variable_get('enable_viewfield', FALSE)) {
+      $mem = return_bytes(ini_get('memory_limit'));
+      if ($mem > 209715200) {
+        return TRUE;
+      }
+      drupal_set_message(t('Your memory is too low for viewfield module. Put it up, change the setting, then put it back down again.'), 'error');
+    }
+    return FALSE;
+  }
+  return TRUE;
+}
+
+/**
+ * Convert a php memory_limit value into bytes.
+ * e.g. 1k returns 1024
+ */
+function return_bytes($val) {
+  $val = trim($val);
+  $last = strtolower($val[strlen($val)-1]);
+  switch($last) {
+  case 'g':
+    $val *= 1024;
+  case 'm':
+    $val *= 1024;
+  case 'k':
+    $val *= 1024;
+  }
+
+  return $val;
+}
+
+/**
+ * Implements hook_block_info().
+ */
+function rmets_system_block_info() {
+
+  $blocks['satellite'] = array(
+    'info' => t('Satellite Image'),
+    'cache' => DRUPAL_NO_CACHE,
+  );
+
+  $blocks['livecustomerads'] = array(
+    'info' => t('Live Customer adverts'),
+    'cache' => DRUPAL_NO_CACHE,
+  );
+
+  return $blocks;
+}
+
+/**
+ * Implements hook_block_configure().
+ */
+function rmets_system_block_configure($delta = '') {
+  $form = array();
+
+  if ($delta == 'livecustomerads') {
+
+    $form['livecustomerads'] = array(
+      '#type' => 'fieldset',
+      '#title' => t('Live customer advert settings'),
+      '#weight' => 5,
+      '#collapsible' => FALSE,
+      '#collapsed' => FALSE,
+    );
+
+    $form['livecustomerads']['livecustomer_advert_url'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Live customer advert URL'),
+      '#description' => t('The URL to the live customer advert code'),
+      '#default_value' => variable_get_value('livecustomer_advert_url'),
+    );
+
+    $form['livecustomerads']['livecustomer_advert_disclaimer'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Disclaimer to show above the adverts'),
+      '#description' => t('A message to show above any adverts returned.'),
+      '#default_value' => variable_get_value('livecustomer_advert_disclaimer'),
+    );
+
+    $form['livecustomerads']['livecustomer_advert_timeout'] = array(
+      '#type' => 'select',
+      '#title' => t('Live customer timeout'),
+      '#description' => t('Number of seconds to wait for the advert server to respond. A long timeout can slow down page requests if the advert system is unresposive'),
+      '#default_value' => variable_get_value('livecustomer_advert_timeout'),
+      '#options' => array(1 => 1, 2 => 2, 3 => 3, 4 => 4, 5 => 5, 6 => 6, 7 => 7, 8 => 8),
+    );
+  }
+
+  return $form;
+}
+
+/**
+ * Implements hook_block_view().
+ */
+function rmets_system_block_view($delta = '') {
+  $block = array();
+
+  if ($delta == 'satellite') {
+
+    // Get the latest gif in the satellite_images directory.
+    // This is the dir that satellite_images get ftp'd into.
+    $files = file_scan_directory('public://satellite_images', '/.*\.gif$/');
+
+    $latest_ctime = 0;
+    $latest_filename = '';
+
+    foreach ($files as $file) {
+      $url = parse_url(file_create_url($file->uri));
+      $path = realpath('.') . $url['path'];
+
+      if (is_file($path) && filectime($path) > $latest_ctime) {
+        $latest_ctime = filectime($path);
+        $latest_filename = $file->filename;
+      }
+    }
+
+    $datetime = date('D, jS F Y H', $latest_ctime) . ':00';
+
+    $block['subject'] = '';
+    $block['content'] = "<img src='/sites/default/files/satellite_images/{$latest_filename}' /><p>{$datetime}</p>";
+  }
+  elseif ($delta == 'livecustomerads') {
+    // Get advert code from livecustomer.net.
+    $url = variable_get_value('livecustomer_advert_url');
+    $timeout = variable_get_value('livecustomer_advert_timeout');
+    $response = drupal_http_request($url, array('timeout' => $timeout));
+
+    $block['subject'] = t('Adverts');
+
+    // If the advert server responded with something
+    // include it. It also puts some cahced comment
+    // into the return as well, we strip that out.
+    $block['content'] = $response->code == 200 ? str_replace('<!--cached-->', '', $response->data) : '';
+
+    if (!empty($block['content'])) {
+      $block['content'] = '<p><em>' . variable_get_value('livecustomer_advert_disclaimer') . '</em></p>' . $block['content'];
+    }
+  }
+
+  return $block;
+}
+
+/**
+ * Implements hook_views_query_alter().
+ *
+ * On the image gallery content admin page, make the
+ * connection to the permissions taxonomy a left join.
+ * This is so we can asks for images with the copyright
+ * given to rmets OR one with a specified permission.
+ */
+function rmets_system_views_query_alter(&$view, &$query) {
+  if ($view->name == 'advanced_content_administration' && $view->current_display == 'image_gallery_search' && !empty($query->table_queue['field_data_field_permissions'])) {
+    $query->table_queue['field_data_field_permissions']['join']->type = 'LEFT';
+  }
+}
+
+/**
+ * Implements hook_commerce_line_item_default_types().
+ */
+function rmets_system_commerce_line_item_default_types() {
+  $items = array(
+    'rmets_events_smartimpact' => array(
+      'name' => 'Rmets Events Smartimpact',
+      'description' => 'A customizable product line item type.',
+      'product' => TRUE,
+      'add_form_submit_value' => 'Add product',
+      'base' => 'commerce_product_line_item',
+    ),
+  );
+  return $items;
+}

@@ -1,0 +1,17 @@
+<?php
+
+/**
+ * Create the membership product.
+ */
+function rmets_membership_purchase_install() {
+  $product = commerce_product_new('rmets_membership_smartimpact');
+  $product->sku = "SMRT";
+  $product->title = "Membership Product";
+  $product->language = LANGUAGE_NONE;
+  $product->uid = 1;
+  $product->commerce_price[LANGUAGE_NONE][0] = array(
+    'amount' => 10 * 100, // $10
+    'currency_code' => "GBP",
+  );
+  commerce_product_save($product);
+}

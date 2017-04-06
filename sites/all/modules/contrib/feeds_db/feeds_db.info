@@ -1,0 +1,15 @@
+name = Feeds Database Import
+description = Provides a Fetcher and a Parser to use external DBs as source for Feeds
+package = Feeds
+core = 7.x
+dependencies[] = feeds
+
+files[] = plugins/DBFetcher.inc
+files[] = plugins/DBParser.inc
+
+; Information added by drupal.org packaging script on 2012-05-12
+version = "7.x-1.0-alpha1+1-dev"
+core = "7.x"
+project = "feeds_db"
+datestamp = "1336781847"
+

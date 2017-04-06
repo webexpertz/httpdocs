@@ -1,0 +1,8 @@
+name = Responsible Person
+description = 
+package = RMetS
+version = VERSION
+core = 7.x
+files[] = responsible_person.install
+files[] = responsible_person.module
+files[] = responsible_person.views.inc

@@ -1,0 +1,528 @@
+<?php
+
+/**
+ * @file
+ * Install and update hooks.
+ */
+
+/**
+ * Relate listing views to the field_user field.
+ */
+function rmets_cpd_accreditation_features_update_7001() {
+  features_revert(
+    array(
+      'rmets_cpd_accreditation_features' => array(
+        'views_view',
+        'commerce_line_item_type',
+      ),
+    )
+  );
+}
+
+/**
+ * Add a rule which redirects users who pay for accreditation
+ * applications back to their application after they have paid.
+ * Updated ruyles and views which send emails to the wrong person.
+ */
+function rmets_cpd_accreditation_features_update_7002() {
+  features_revert(
+    array(
+      'rmets_cpd_accreditation_features' => array(
+        'views_view',
+        'rules_config',
+        'field',
+        'field_group',
+        'field_instance',
+        'ds_field_settings',
+        'ds_fields',
+        'ds_layout_settings',
+      ),
+    )
+  );
+}
+
+/**
+ * Fixed user tokens in rules.
+ */
+function rmets_cpd_accreditation_features_update_7003() {
+  features_revert(
+    array(
+      'rmets_cpd_accreditation_features' => array(
+        'rules_config',
+      ),
+    )
+  );
+}
+
+/**
+ * Added date started to my cpd accreditations view.
+ */
+function rmets_cpd_accreditation_features_update_7004() {
+  features_revert(
+    array(
+      'rmets_cpd_accreditation_features' => array(
+        'views_view',
+      ),
+    )
+  );
+}
+
+/**
+ * Added corret permissions to the accreditation views list.
+ */
+function rmets_cpd_accreditation_features_update_7005() {
+  features_revert(
+    array(
+      'rmets_cpd_accreditation_features' => array(
+        'views_view',
+      ),
+    )
+  );
+}
+
+/**
+ * Added path breadcrumbs when viewing an application.
+ */
+function rmets_cpd_accreditation_features_update_7006() {
+  features_revert(
+    array(
+      'rmets_cpd_accreditation_features' => array(
+        'path_breadcrumbs',
+      ),
+    )
+  );
+}
+
+/**
+ * Added a nice pathauto pattern for accreditation nodes.
+ * Made all text fields forced to member format to prevent access denied issues.
+ * removed the empty view add butto which does not always work.
+ */
+function rmets_cpd_accreditation_features_update_7007() {
+  features_revert(
+    array(
+      'rmets_cpd_accreditation_features' => array(
+        'variable',
+        'field',
+        'field_instance',
+        'views_view',
+      ),
+    )
+  );
+}
+
+/**
+ * Added a description for field_status.
+ */
+function rmets_cpd_accreditation_features_update_7008() {
+  features_revert(
+    array(
+      'rmets_cpd_accreditation_features' => array(
+        'field',
+        'field_instance',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated the field about being published on the RMetS web site to not be mandatory.
+ * Updated the list of status' on the Admin report.
+ */
+function rmets_cpd_accreditation_features_update_7009() {
+  features_revert(
+    array(
+      'rmets_cpd_accreditation_features' => array(
+        'field',
+        'field_instance',
+        'views_view',
+      ),
+    )
+  );
+}
+
+/**
+ * Added the print display for accreditation.
+ */
+function rmets_cpd_accreditation_features_update_7010() {
+  features_revert(
+    array(
+      'rmets_cpd_accreditation_features' => array(),
+    )
+  );
+}
+
+/**
+ * Added the print links for accreditation view.
+ */
+function rmets_cpd_accreditation_features_update_7011() {
+  features_revert(
+    array(
+      'rmets_cpd_accreditation_features' => array(
+        'ds_field_settings',
+        'ds_fields',
+        'ds_layout_settings',
+      ),
+    )
+  );
+}
+
+/**
+ * Changed a field to no longer be required.
+ * Changed CPD Record titles to be links.
+ * Changed the work experience field to be unlimited.
+ */
+function rmets_cpd_accreditation_features_update_7013() {
+  features_revert(
+    array(
+      'rmets_cpd_accreditation_features' => array(
+        'field',
+        'field_instance',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated view for reviewers to be able to see a listing.
+ */
+function rmets_cpd_accreditation_features_update_7014() {
+  features_revert(
+    array(
+      'rmets_cpd_accreditation_features' => array(
+        'views_view',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated Group/ field labels.
+ * Updated Reviewer view to include reviewer status.
+ */
+function rmets_cpd_accreditation_features_update_7015() {
+  features_revert(
+    array(
+      'rmets_cpd_accreditation_features' => array(
+        'field',
+        'field_instance',
+        'field_group',
+        'views_view',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated Group/ field labels.
+ * Updated rules for processing applications.
+ */
+function rmets_cpd_accreditation_features_update_7016() {
+  features_revert(
+    array(
+      'rmets_cpd_accreditation_features' => array(
+        'field',
+        'field_instance',
+        'rules_config',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated rules for email address eamils are being sent to.
+ */
+function rmets_cpd_accreditation_features_update_7017() {
+  features_revert(
+    array(
+      'rmets_cpd_accreditation_features' => array(
+        'rules_config',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated display of cpd records.
+ * Added new fields for the declaration.
+ */
+function rmets_cpd_accreditation_features_update_7018() {
+  features_revert(
+    array(
+      'rmets_cpd_accreditation_features' => array(
+        'field',
+        'field_instance',
+        'field_group',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated reviewer listing to link to reviewer URL.
+ * Added reviewer breadcrumbs.
+ */
+function rmets_cpd_accreditation_features_update_7019() {
+  features_revert(
+    array(
+      'rmets_cpd_accreditation_features' => array(
+        'field',
+        'field_instance',
+        'views_view',
+        'path_breadcrumbs',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated fields and ordering for display.
+ * Added previous name field.
+ */
+function rmets_cpd_accreditation_features_update_7020() {
+  features_revert(
+    array(
+      'rmets_cpd_accreditation_features' => array(
+        'field',
+        'field_instance',
+        'field_group',
+        'ds_field_settings',
+        'ds_fields',
+        'ds_layout_settings',
+      ),
+    )
+  );
+}
+
+/**
+ * Added notes field.
+ * Updated views filters.
+ */
+function rmets_cpd_accreditation_features_update_7021() {
+  features_revert(
+    array(
+      'rmets_cpd_accreditation_features' => array(
+        'field',
+        'field_instance',
+        'field_group',
+        'views_view',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated date fields.
+ * Updated rules to set correct reviewer url.
+ * Updated reviewer tab name.
+ * Added email field to the admin report.
+ */
+function rmets_cpd_accreditation_features_update_7022() {
+  features_revert(
+    array(
+      'rmets_cpd_accreditation_features' => array(
+        'field',
+        'field_instance',
+        'rules_config',
+        'views_view',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated rules to set correct reviewer URL & admin URL.
+ */
+function rmets_cpd_accreditation_features_update_7023() {
+  features_revert(
+    array(
+      'rmets_cpd_accreditation_features' => array(
+        'rules_config',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated rules to set order to completed.
+ * Updated email text sent via rules.
+ */
+function rmets_cpd_accreditation_features_update_7024() {
+  features_revert(
+    array(
+      'rmets_cpd_accreditation_features' => array(
+        'rules_config',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated email text sent via rules.
+ */
+function rmets_cpd_accreditation_features_update_7025() {
+  features_revert(
+    array(
+      'rmets_cpd_accreditation_features' => array(
+        'rules_config',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated work experience field.
+ */
+function rmets_cpd_accreditation_features_update_7026() {
+  features_revert(
+    array(
+      'rmets_cpd_accreditation_features' => array(
+        'field',
+        'field_instance',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated title text on view listings.
+ */
+function rmets_cpd_accreditation_features_update_7027() {
+  features_revert(
+    array(
+      'rmets_cpd_accreditation_features' => array(
+        'views_view',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated email text for successful application.
+ * Updated the accreditation listing to have sortable columns.
+ */
+function rmets_cpd_accreditation_features_update_7028() {
+  features_revert(
+    array(
+      'rmets_cpd_accreditation_features' => array(
+        'rules_config',
+        'views_view',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated default sort order.
+ */
+function rmets_cpd_accreditation_features_update_7029() {
+  features_revert(
+    array(
+      'rmets_cpd_accreditation_features' => array(
+        'views_view',
+      ),
+    )
+  );
+}
+
+/**
+ * Added Rule for sending out email reminders.
+ */
+function rmets_cpd_accreditation_features_update_7030() {
+  features_revert(
+    array(
+      'rmets_cpd_accreditation_features' => array(
+        'rules_config',
+        'field',
+        'field_instance',
+      ),
+    )
+  );
+}
+
+/**
+ * Added CRM accreditation fields.
+ */
+function rmets_cpd_accreditation_features_update_7031() {
+  features_revert(
+    array(
+      'rmets_cpd_accreditation_features' => array(
+        'rules_config',
+        'field',
+        'field_instance',
+        'user_permission',
+        'views_view',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated labels and descriptions for fields.
+ */
+function rmets_cpd_accreditation_features_update_7032() {
+  features_revert(
+    array(
+      'rmets_cpd_accreditation_features' => array(
+        'field',
+        'field_instance',
+        'field_group',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated email for reviewers on applications.
+ */
+function rmets_cpd_accreditation_features_update_7033() {
+  features_revert(
+    array(
+      'rmets_cpd_accreditation_features' => array(
+        'rules_config',
+      ),
+    )
+  );
+}
+
+/**
+ * Update permissions.
+ */
+function rmets_cpd_accreditation_features_update_7034() {
+  features_revert(
+    array(
+      'rmets_cpd_accreditation_features' => array(
+        'user_permission',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated email for reviewers on applications.
+ */
+function rmets_cpd_accreditation_features_update_7035() {
+  features_revert(
+    array(
+      'rmets_cpd_accreditation_features' => array(
+        'rules_config',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated mandatory for work experience.
+ */
+function rmets_cpd_accreditation_features_update_7036() {
+  features_revert(
+    array(
+      'rmets_cpd_accreditation_features' => array(
+        'rules_config',
+        'field',
+        'field_instance',
+        'views_view',
+      ),
+    )
+  );
+}

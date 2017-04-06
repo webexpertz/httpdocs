@@ -1,0 +1,35 @@
+<?php
+
+/**
+ * Implements hook_requirements().
+ */
+function rmets_events_requirements($phase) {
+  $requirements = array();
+
+  if ($phase == 'runtime') {
+
+    $date = variable_get('rmets_events_last_sync', t('NEVER'));
+    $requirement = REQUIREMENT_WARNING;
+
+    if ($date === FALSE) {
+      $date = t('Last synchronisation via cron failed. Please check the error logs then run manually to get cron to work again');
+      $requirement = REQUIREMENT_ERROR;
+    }
+    elseif (is_numeric($date)) {
+      if (time() < ($date + 86400)) {
+        $requirement = REQUIREMENT_OK;
+      }
+      $date = date('r', $date);
+    }
+
+    $requirements['rmets_events'] = array(
+      'title' => t('Events'),
+      'value' => t('Last synced on: %date ', array('%date' => $date)),
+      'description' => t('The events are stored in CRM and synchronised overnight. ') . l(t('Synchronise now'), 'admin/reports/status/rmets_event_sync', array('query' => array(drupal_get_destination()))),
+      'severity' => $requirement,
+    );
+
+  }
+
+  return $requirements;
+}

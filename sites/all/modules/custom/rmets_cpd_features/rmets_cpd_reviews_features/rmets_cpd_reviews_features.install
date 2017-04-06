@@ -1,0 +1,547 @@
+<?php
+
+/**
+ * @file
+ * Install and update hooks.
+ */
+
+/**
+ * Update of views and fields.
+ */
+function rmets_cpd_reviews_features_update_7001() {
+  features_revert(
+    array(
+      'rmets_cpd_reviews_features' => array(
+        'views_view',
+        'field',
+        'field_instance',
+        'field_group',
+       ),
+    )
+  );
+}
+
+/**
+ * Update of workflow permissions.
+ */
+function rmets_cpd_reviews_features_update_7002() {
+  features_revert(
+    array(
+      'rmets_cpd_reviews_features' => array(
+        'workflow_access',
+       ),
+    )
+  );
+}
+
+/**
+ * Update of workflow states.
+ */
+function rmets_cpd_reviews_features_update_7003() {
+  features_revert(
+    array(
+      'rmets_cpd_reviews_features' => array(
+        'field',
+        'field_instance',
+        'rules_config',
+        'workflow',
+       ),
+    )
+  );
+}
+
+/**
+ * Allowed qualifying qork experience back 10 years.
+ */
+function rmets_cpd_reviews_features_update_7004() {
+  features_revert(
+    array(
+      'rmets_cpd_reviews_features' => array(
+        'field',
+        'field_instance',
+       ),
+    )
+  );
+}
+
+/**
+ * Update of views to apply correct permissions to the view.
+ */
+function rmets_cpd_reviews_features_update_7005() {
+  features_revert(
+    array(
+      'rmets_cpd_reviews_features' => array(
+        'views_view',
+       ),
+    )
+  );
+}
+
+/**
+ * Added path breadcrumbs to the CPD review view.
+ */
+function rmets_cpd_reviews_features_update_7006() {
+  features_revert(
+    array(
+      'rmets_cpd_reviews_features' => array(
+        'path_breadcrumbs',
+       ),
+    )
+  );
+}
+
+/**
+ * Fixed missing name in rules email.
+ */
+function rmets_cpd_reviews_features_update_7007() {
+  features_revert(
+    array(
+      'rmets_cpd_reviews_features' => array(
+        'rules_config',
+       ),
+    )
+  );
+}
+
+/**
+ * Added a nice pathauto pattern for review report nodes.
+ * Made all text fields forced to member format to prevent access denied issues.
+ * Removed the extra button when no reviews which does not always work.
+ */
+function rmets_cpd_reviews_features_update_7008() {
+  features_revert(
+    array(
+      'rmets_cpd_reviews_features' => array(
+        'variable',
+        'field',
+        'field_instance',
+        'views_view',
+      ),
+    )
+  );
+}
+
+/**
+ * Added a description for field status.
+ */
+function rmets_cpd_reviews_features_update_7009() {
+  features_revert(
+    array(
+      'rmets_cpd_reviews_features' => array(
+        'field',
+        'field_instance',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated the work experience field collection to list 3 items.
+ * Updated the dates to have no default value.
+ * Updated the start date to go back 20 years.
+ */
+function rmets_cpd_reviews_features_update_7010() {
+  features_revert(
+    array(
+      'rmets_cpd_reviews_features' => array(
+        'field',
+        'field_instance',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated the report admin view for the status filtering.
+ */
+function rmets_cpd_reviews_features_update_7011() {
+  features_revert(
+    array(
+      'rmets_cpd_reviews_features' => array(
+        'views_view',
+      ),
+    )
+  );
+}
+
+/**
+ * Added the print links for report view.
+ */
+function rmets_cpd_reviews_features_update_7012() {
+  features_revert(
+    array(
+      'rmets_cpd_reviews_features' => array(
+        'ds_field_settings',
+        'ds_fields',
+        'ds_layout_settings',
+      ),
+    )
+  );
+}
+
+/**
+ * Changed CPD Record titles to be links.
+ * Changed the work experience field to be unlimited.
+ * Change the employment to date to go back 20 years.
+ */
+function rmets_cpd_reviews_features_update_7015() {
+  features_revert(
+    array(
+      'rmets_cpd_reviews_features' => array(
+        'field',
+        'field_instance',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated view for reviewers to be able to see a listing.
+ */
+function rmets_cpd_reviews_features_update_7016() {
+  features_revert(
+    array(
+      'rmets_cpd_reviews_features' => array(
+        'field',
+        'views_view',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated Group/ field labels.
+ * Updated Reviewer view to include reviewer status.
+ */
+function rmets_cpd_reviews_features_update_7017() {
+  features_revert(
+    array(
+      'rmets_cpd_reviews_features' => array(
+        'field',
+        'field_instance',
+        'field_group',
+        'views_view',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated field ordering.
+ */
+function rmets_cpd_reviews_features_update_7018() {
+  features_revert(
+    array(
+      'rmets_cpd_reviews_features' => array(
+        'field',
+        'field_instance',
+        'field_group',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated views.
+ */
+function rmets_cpd_reviews_features_update_7019() {
+  features_revert(
+    array(
+      'rmets_cpd_reviews_features' => array(
+        'views_view',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated rules for email address eamils are being sent to.
+ */
+function rmets_cpd_reviews_features_update_7020() {
+  features_revert(
+    array(
+      'rmets_cpd_reviews_features' => array(
+        'rules_config',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated display of cpd records.
+ * Updated the year filter for CPD Records.
+ */
+function rmets_cpd_reviews_features_update_7021() {
+  features_revert(
+    array(
+      'rmets_cpd_reviews_features' => array(
+        'field',
+        'field_instance',
+        'views_view',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated reviewer listing to link to reviewer URL.
+ * Added reviewer breadcrumbs.
+ */
+function rmets_cpd_reviews_features_update_7022() {
+  features_revert(
+    array(
+      'rmets_cpd_reviews_features' => array(
+        'field',
+        'field_instance',
+        'views_view',
+        'path_breadcrumbs',
+      ),
+    )
+  );
+}
+
+/**
+ * Added previous name field.
+ * Added help text to the content type.
+ */
+function rmets_cpd_reviews_features_update_7023() {
+  features_revert(
+    array(
+      'rmets_cpd_reviews_features' => array(
+        'field',
+        'field_instance',
+        'field_group',
+      ),
+    )
+  );
+}
+
+/**
+ * Added last submission date.
+ * Updated views filters.
+ */
+function rmets_cpd_reviews_features_update_7024() {
+  features_revert(
+    array(
+      'rmets_cpd_reviews_features' => array(
+        'field',
+        'field_instance',
+        'field_group',
+        'views_view',
+        'ds_field_settings',
+        'ds_fields',
+        'ds_layout_settings',
+      ),
+    )
+  );
+}
+
+/**
+ * Update date fields to go back 100 years.
+ * Updated rules to set correct reviewer url.
+ * Updated reviewer tab name.
+ * Added email field to the admin report.
+ */
+function rmets_cpd_reviews_features_update_7025() {
+  features_revert(
+    array(
+      'rmets_cpd_reviews_features' => array(
+        'field',
+        'field_instance',
+        'rules_config',
+        'views_view',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated rules to set correct reviewer URL & admin URL.
+ */
+function rmets_cpd_reviews_features_update_7026() {
+  features_revert(
+    array(
+      'rmets_cpd_reviews_features' => array(
+        'rules_config',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated text and setting on views.
+ */
+function rmets_cpd_reviews_features_update_7027() {
+  features_revert(
+    array(
+      'rmets_cpd_reviews_features' => array(
+        'views_view',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated text on views.
+ * Updated email text.
+ */
+function rmets_cpd_reviews_features_update_7028() {
+  features_revert(
+    array(
+      'rmets_cpd_reviews_features' => array(
+        'rules_config',
+        'views_view',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated work experience field.
+ */
+function rmets_cpd_reviews_features_update_7029() {
+  features_revert(
+    array(
+      'rmets_cpd_reviews_features' => array(
+        'field',
+        'field_instance',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated title text on view listings.
+ */
+function rmets_cpd_reviews_features_update_7030() {
+  features_revert(
+    array(
+      'rmets_cpd_reviews_features' => array(
+        'views_view',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated reviewer status options.
+ */
+function rmets_cpd_reviews_features_update_7031() {
+  features_revert(
+    array(
+      'rmets_cpd_reviews_features' => array(
+        'field',
+        'field_instance',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated header text for the cpd record widget.
+ */
+function rmets_cpd_reviews_features_update_7032() {
+  features_revert(
+    array(
+      'rmets_cpd_reviews_features' => array(
+        'views_view',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated header text for the cpd record widget.
+ */
+function rmets_cpd_reviews_features_update_7033() {
+  features_revert(
+    array(
+      'rmets_cpd_reviews_features' => array(
+        'views_view',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated default sort order.
+ */
+function rmets_cpd_reviews_features_update_7034() {
+  features_revert(
+    array(
+      'rmets_cpd_reviews_features' => array(
+        'views_view',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated email content in application reminder rule.
+ */
+function rmets_cpd_reviews_features_update_7035() {
+  features_revert(
+    array(
+      'rmets_cpd_reviews_features' => array(
+        'rules_config',
+      ),
+    )
+  );
+}
+
+/**
+ * Update the user permissions and views.
+ */
+function rmets_cpd_reviews_features_update_7036() {
+  features_revert(
+    array(
+      'rmets_cpd_reviews_features' => array(
+        'user_permission',
+        'views_view',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated email content.
+ */
+function rmets_cpd_reviews_features_update_7037() {
+  features_revert(
+    array(
+      'rmets_cpd_reviews_features' => array(
+        'rules_config',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated fields on cpd report.
+ */
+function rmets_cpd_reviews_features_update_7038() {
+  features_revert(
+    array(
+      'rmets_cpd_reviews_features' => array(
+        'field',
+        'field_instance',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated fields & view for cpd report.
+ */
+function rmets_cpd_reviews_features_update_7039() {
+  features_revert(
+    array(
+      'rmets_cpd_reviews_features' => array(
+        'field',
+        'field_instance',
+        'field_group',
+        'views_view',
+      ),
+    )
+  );
+}

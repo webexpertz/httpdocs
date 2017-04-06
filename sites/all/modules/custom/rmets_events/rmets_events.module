@@ -1,0 +1,736 @@
+<?php
+
+/**
+ * @file
+ * Syncing Event Details from CRM
+ */
+
+use Drupal\rmets_events\EntityWrapper\Node\EventWrapper;
+use Drupal\rmets_crm\Api\Request\OptionsetRequest;
+use Drupal\rmets_events\EntityWrapper\Node\EventAbstractWrapper;
+use Drupal\rmets_crm\Api\Request\GetAllEventsRequest;
+use Drupal\rmets_crm\Api\Request\GetAllSuffixesRequest;
+use Drupal\rmets_crm\Api\Request\CreateEventRegistrationRequest;
+use Drupal\rmets_membership_user\EntityWrapper\User\UserWrapper;
+use Drupal\rmets_crm\Model\EventSession;
+use Drupal\rmets_crm\Model\EventSessionItem;
+use Drupal\rmets_crm\Model\EventSpeaker;
+use Drupal\rmets_crm\Api\Request\GetEventAbstractRequest;
+use Drupal\rmets_crm\Model\EventAbstract;
+
+/**
+ * Implements hook_cron().
+ */
+function rmets_events_cron() {
+  // Run all at once.
+  $last_run = variable_get('rmets_events_last_sync', 0);
+
+  // Only run in the small hours if past a time once every 24 hours
+  // or any cron run when last_run is 0 (never run before).
+  if ($last_run !== FALSE && time() > ($last_run + 3600) && ($last_run == 0 || date('G') == '1')) {
+    rmets_events_update_nodes_from_crm();
+  }
+}
+
+/**
+ * Implements hook_menu().
+ */
+function rmets_events_menu() {
+  $items = array();
+
+  $items['event/register/%node'] = array(
+    'title' => 'Register for event',
+    'description' => 'Description',
+    'access callback' => 'user_access',
+    'access arguments' => array('rmets_events registration'),
+    'page callback' => 'rmets_events_register_page',
+    'page arguments' => array(2),
+    'type' => MENU_CALLBACK,
+    'file' => 'rmets_events.pages.inc',
+  );
+
+  $items['event/%/abstract/%rmets_events_abstract'] = array(
+    'title callback' => 'rmets_events_abstract_page_title',
+    'title arguments' => array(3),
+    'access callback' => TRUE,
+    'access arguments' => array('access content'),
+    'page callback' => 'rmets_events_abstract_page',
+    'page arguments' => array(3),
+    'type' => MENU_CALLBACK,
+    'file' => 'rmets_events.pages.inc',
+  );
+
+  $items['admin/reports/status/rmets_event_sync'] = array(
+    'title' => 'Register for event',
+    'description' => 'Description',
+    'type' => MENU_CALLBACK,
+    'access callback' => 'user_access',
+    'access arguments' => array('administer nodes'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('rmets_events_crm_sync_confirm'),
+    'file' => 'rmets_events.admin.inc',
+  );
+
+  return $items;
+}
+
+/**
+ * Callback for the menu title.
+ *
+ * @param EventAbstract $abstract
+ *
+ * @return string
+ */
+function rmets_events_abstract_page_title($abstract) {
+  if (empty($abstract)) {
+    return '';
+  }
+  return $abstract->getTitle();
+}
+
+/**
+ * Menu autoloader to load the abstract from its id.
+ */
+function rmets_events_abstract_load($abstract_id) {
+  try {
+    $request = new GetEventAbstractRequest();
+    $request->setGuid(variable_get('rmets_crm_api_guid', ''));
+    $request->setPage(1);
+    $request->setRecordCount(100);
+    $request->setAbstractId($abstract_id);
+
+    /** @var \Drupal\rmets_crm\Api\CrmService $api */
+    $api = rmets_crm_get_api();
+    $response = $api->getEventAbstract($request);
+
+    /** @var EventAbstract $abstract */
+    return $response->getIterator()->current();
+
+  } catch (InvalidRequestException $e) {
+    //drush_set_error('FATAL', $e->getMessage());
+  } catch (ApiServerException $apie) {
+    //drush_set_error('FATAL', 'Unable to communicate with the CRM API: ' . $apie->getMessage());
+  }
+  return NULL;
+}
+
+/**
+ * Implements hook_permission().
+ */
+function rmets_events_permission() {
+  return array(
+    'rmets_events registration' => array(
+      'title' => t('Can register for RMetS events'),
+      'description' => t('Allow user to register for RMets Events'),
+    ),
+  );
+}
+
+/**
+ * Loop through the events we have in CRM and update the nodes.
+ *
+ * This will be called from cron.
+ */
+function rmets_events_update_nodes_from_crm() {
+  $events_from_crm = rmets_events_get_events_from_crm();
+  foreach ($events_from_crm AS $event_from_crm) {
+    $query = new EntityFieldQuery();
+    $query->entityCondition('entity_type', 'node');
+    $query->fieldCondition('field_event_id', 'value', $event_from_crm->getEventId(), '=');
+    $result = $query->execute();
+
+    if (!empty($result['node'])) {
+      foreach ($result['node'] AS $nid => $nid) {
+        $event_nodes = entity_load('node', array_keys($result['node']));
+      }
+      if (!empty($event_nodes)) {
+        $event_node = current($event_nodes);
+      }
+    }
+    else {
+      $values = array(
+        'type' => 'event',
+        'uid' => $GLOBALS['user']->uid,
+        'status' => 1,
+        'comment' => 0,
+        'promote' => 0,
+      );
+      $event_node = entity_create('node', $values);
+    }
+    if (!empty($event_node)) {
+      $wrapper = new EventWrapper($event_node, $event_from_crm);
+      $wrapper->updateEventFromCrm();
+    }
+
+  }
+  variable_set('rmets_events_last_sync', time());
+}
+
+/**
+ * Get events from CRM.
+ *
+ * @param $fromDate - A date in the format DD-MM-YYYY
+ * @return bool|\Drupal\rmets_crm\Api\Response\EventResponse
+ * @throws \Drupal\rmets_crm\Api\ApiServerException
+ */
+function rmets_events_get_events_from_crm($fromDate = NULL) {
+  try {
+    $request = new GetAllEventsRequest();
+    $request->setGuid(variable_get('rmets_crm_api_guid', ''));
+    $request->setPage(1);
+    $request->setRecordCount(600);
+
+    if (!empty($fromDate)) {
+      $request->setFromDate($fromDate);
+    }
+    else {
+      $request->setFromDate('06-06-2015');
+    }
+
+    /** @var \Drupal\rmets_crm\Api\CrmService $api */
+    $api = rmets_crm_get_api();
+    return $api->getAllEvents($request);
+  }
+  catch (InvalidRequestException $e) {
+    drupal_set_message($e->getMessage(), 'error');
+    return FALSE;
+  }
+  catch (ApiServerException $apie) {
+    drupal_set_message(t('Unable to connect to our membership database.'), 'error');
+    return FALSE;
+  }
+}
+
+/**
+ * Get options for the Type of abstract.
+ *
+ * Used for event create/update.
+ *
+ * @return array
+ * @throws \Drupal\rmets_crm\Api\ApiServerException
+ */
+function rmets_events_get_event_abstract_type_options_from_crm() {
+  try {
+    $request = new OptionsetRequest();
+    $request->setGuid(variable_get('rmets_crm_api_guid', ''));
+
+    /** @var \Drupal\rmets_crm\Api\CrmService $api */
+    $api = rmets_crm_get_api();
+    $response = $api->optionsetAbstractsTypes($request);
+    $options = array();
+    $options[NULL] = ' - select - ';
+    foreach ($response AS $option) {
+      $options[$option->getKey()] = $option->getValue();
+    }
+    return $options;
+  }
+  catch (InvalidRequestException $e) {
+    drupal_set_message($e->getMessage(), 'error');
+    return FALSE;
+  }
+  catch (ApiServerException $apie) {
+    drupal_set_message(t('Unable to connect to our membership database.'), 'error');
+    return FALSE;
+  }
+}
+
+/**
+ * @param array($data) The data from the form.
+ * @throws \Drupal\rmets_crm\Api\ApiServerException
+ */
+function rmets_events_create_event_registration($data) {
+  try {
+    $request = new CreateEventRegistrationRequest();
+    $request->setGuid(variable_get('rmets_crm_api_guid', ''));
+    $request->setEventId($data['crm_event_id']);
+    $request->setContactId($data['contact_id']);
+    $request->setRegistrationFeeId($data['fees']);
+    if (!empty($data['affiliate_name'])) {
+      $request->setOrganisationName($data['affiliate_name']);
+    }
+    $dietary_requirements = '';
+    if (!empty($data['dietary_requirements'])) {
+      $dietary_requirements .= implode("\r\n", $data['dietary_requirements']);
+    }
+    if (!empty($data['dietary_requirements_other'])) {
+      $dietary_requirements .= "\r\n" . $data['dietary_requirements_other'];
+    }
+    $request->setDietaryRequirements($dietary_requirements);
+
+    $special_requirements = '';
+    if (!empty($data['special_requirements'])) {
+      $special_requirements .= implode("\r\n", $data['special_requirements']);
+    }
+    if (!empty($data['special_requirements_other'])) {
+      $special_requirements .= "\r\n" . $data['special_requirements_other'];
+    }
+    $request->setSpecialRequirements($special_requirements);
+    //die(print_r($request));
+
+    /** @var \Drupal\rmets_crm\Api\CrmService $api */
+    $api = rmets_crm_get_api();
+    $api->createEventRegistration($request);
+
+    // Send registration confirmation email.
+    _rmets_events_send_registration_email($data, $dietary_requirements, $special_requirements);
+
+    drupal_set_message('Thank you for registering for this event.');
+    $event_path = drupal_get_path_alias('node/' . $data['event_id']);
+    drupal_goto($event_path);
+  }
+  catch (InvalidRequestException $e) {
+    drupal_set_message($e->getMessage(), 'error');
+    return FALSE;
+  }
+  catch (ApiServerException $apie) {
+    drupal_set_message(t('Unable to connect to our membership database.'), 'error');
+    return FALSE;
+  }
+}
+
+/**
+ * Helper function to send a registration confirmation email.
+ *
+ * @param $data
+ * @param $dietary_requirements
+ * @param $special_requirements
+ */
+function _rmets_events_send_registration_email($data, $dietary_requirements, $special_requirements) {
+  $optional_extras = array();
+  foreach ($data['optional_extras'] as $key => $value) {
+    if (!empty($value)) {
+      $optional_extras[] = $data['complete form']['optional_extras']['#options'][$key];
+    }
+  }
+
+  /** @var UserWrapper $user_wrapper */
+  $user_wrapper = $data['crm_member'];
+  $to = $user_wrapper->getEmail();
+  $from = 'noreply@rmets.org.uk';
+  $node = node_load($data['event_id']);
+  $body = sprintf('Dear %s,
+
+Thank you for registering for the event: %s.
+
+Your registration details are:
+
+Selected package: %s
+%s%s%s%s
+
+Regards
+
+The Conferences and Events team
+The Royal Meteorological Society
+
+Invoices are available for paid events, please email the society at accounts@rmets.org
+', $user_wrapper->getTitle() . ' ' . $user_wrapper->getForename() . ' ' . $user_wrapper->getSurname(),
+    $node->title,
+    !empty($data['affiliate_name']) ? 'Affiliate name: ' . $data['affiliate_name'] . "\n" : '',
+    $data['complete form']['fees']['#options'][$data['fees']] . "\n",
+    !empty($optional_extras) ? "Optional extras: \n" . implode("\n\t", $optional_extras) . "\n" : '',
+    !empty($dietary_requirements) ? "Dietary Requirements: \n" . str_replace("\r\n", "\n\t", $dietary_requirements) . "\n" : '',
+    !empty($special_requirements) ? "Special Requirements: \n" . str_replace("\r\n", "\n\t", $special_requirements) . "\n" : ''
+  );
+
+  $params = array(
+    'subject' => 'Thank you for registering for: '. $node->title,
+    'body' => $body,
+  );
+  drupal_mail('rmets_events', 'event_registration_notification', $to, LANGUAGE_NONE, $params, $from);
+}
+
+/**
+ * Implements hook_node_insert().
+ */
+function rmets_events_node_insert($node) {
+  _rmets_events_node_save($node);
+}
+
+/**
+ * Implements hook_node_update().
+ */
+function rmets_events_node_update($node) {
+  _rmets_events_node_save($node);
+}
+
+/**
+ * Callback function to send notification on the saving of a node.
+ */
+function _rmets_events_node_save($node) {
+  if ($node->type == 'event_abstract') {
+    try {
+      $wrapper = new EventAbstractWrapper($node);
+      $wrapper->addAbstractToCrm();
+    }
+    catch (Exception $e) {
+      drupal_set_message('Failed to sync to CRM' . $e->getMessage(), 'error');
+    }
+  }
+}
+
+/**
+ * Implements hook_field_widget_form_alter().
+ */
+function rmets_events_field_widget_form_alter(&$element, &$form_state, $context) {
+  if ($context['field']['field_name'] == 'field_author_title') {
+    global $user;
+    $account = $user;
+    $user_wrapper = new UserWrapper(user_load($account->uid));
+    $element['#options'] += $user_wrapper->getTitleOptions();
+    if (isset($context['form']['#entity']->field_author_title['und'])) {
+      $element['#default_value'] = array_column($context['form']['#entity']->field_author_title['und'], 'value');
+    }
+  }
+  if ($context['field']['field_name'] == 'field_author_post_nominals') {
+    $element['#options'] += rmets_events_get_event_suffix_type_options_from_crm();
+    $element['#multiple'] = TRUE;
+    $element['#chosen'] = TRUE;
+    if (isset($context['form']['#entity']->field_author_post_nominals['und'])) {
+      $element['#default_value'] = array_column($context['form']['#entity']->field_author_post_nominals['und'], 'value');
+    }
+  }
+}
+
+/**
+ * Implements hook_preprocess_field_multiple_value_form().
+ */
+function rmets_events_preprocess_field_multiple_value_form(&$variables) {
+  if ($variables['element']['#field_name'] == 'field_fc_abstract_authors') {
+    $variables['element']['add_more']['#value'] = 'Add another author';
+  }
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function rmets_events_form_node_form_alter(&$form, &$form_state, $form_id) {
+  $access = $GLOBALS['user']->uid == 1;
+  if ($form['type']['#value'] == 'event_abstract') {
+    if (isset($form['field_abstract_time_and_date'])) {
+      $form['field_abstract_time_and_date']['#access'] = $access;
+    }
+    if (isset($form['field_presentation_number_2'])) {
+      $form['field_presentation_number_2']['#access'] = $access;
+    }
+    if (isset($form['field_event_sub_session'])) {
+      $form['field_event_sub_session']['#access'] = $access;
+    }
+    if (isset($form['field_new_abstract_type'])) {
+      $form['field_new_abstract_type']['und']['#options'] = rmets_events_get_event_abstract_type_options_from_crm();
+      if (!empty($form['#node']->field_new_abstract_type['und'][0]['value'])) {
+        $form['field_new_abstract_type']['und']['#default_value'] = $form['#node']->field_new_abstract_type['und'][0]['value'];
+      }
+      $form['field_abstract_type']['#access'] = FALSE;
+    }
+    if (isset($form['field_event_abstract_id'])) {
+      $form['field_event_abstract_id']['#access'] = $access;
+    }
+    if (isset($form['field_presenting_author'])) {
+      $form['field_presenting_author']['#access'] = FALSE;
+    }
+    if (isset($form['field_abstract_authors'])) {
+      $form['field_abstract_authors']['#access'] = FALSE;
+    }
+    if (isset($form['actions']['submit']['#value'])) {
+      $form['actions']['submit']['#value'] = 'Submit';
+    }
+  }
+  if ($form['type']['#value'] == 'event') {
+    drupal_set_message('Events are synced from CRM. Any changes here may be overwritten!', 'warning', FALSE);
+    if (isset($form['field_themes'])) {
+      $form['field_themes']['#access'] = $access;
+    }
+    if (isset($form['field_event_id'])) {
+      $form['field_event_id']['#access'] = $access;
+    }
+    if (isset($form['field_event_date'])) {
+      $form['field_event_date']['#access'] = $access;
+    }
+    if (isset($form['field_event_email'])) {
+      $form['field_event_email']['#access'] = $access;
+    }
+    if (isset($form['field_sessions'])) {
+      $form['field_sessions']['#access'] = $access;
+    }
+  }
+}
+
+function rmets_events_get_event_suffix_type_options_from_crm() {
+  $options = array();
+  try {
+    $request = new GetAllSuffixesRequest();
+    $request->setGuid(variable_get('rmets_crm_api_guid', ''));
+    $request->setPage(1);
+    $request->setRecordCount(100);
+
+
+    /** @var \Drupal\rmets_crm\Api\CrmService $api */
+    $api = rmets_crm_get_api();
+    $response = $api->getAllSuffixes($request);
+    $options = array();
+    foreach ($response AS $id => $suffix) {
+      $options[$suffix->getSuffixID()] = $suffix->getName();
+    }
+  }
+  catch (InvalidRequestException $e) {
+    watchdog('rmets_events', 'FATAL' . check_plain($e->getMessage()));
+  }
+  catch (ApiServerException $apie) {
+    watchdog('rmets_events', 'FATAL' . check_plain($apie->getMessage()));
+  }
+  return $options;
+}
+
+/**
+ * Implements hook_node_prepare().
+ */
+function rmets_events_node_prepare($node) {
+  if ($node->type == 'event_abstract') {
+    $wrapper = new EventAbstractWrapper($node);
+    $wrapper->updateAbstractFromCRM();
+  }
+}
+
+/**
+ * Submit callback for the Purchase Form.
+ */
+function rmets_events_send_event_to_commerce($data) {
+  global $user;
+  $user_wrapper = new UserWrapper(user_load($user->uid));
+  $user_wrapper->updateFromCrm();
+  $product = rmets_events_get_commerce_product();
+  $order = commerce_order_new($user->uid, 'checkout_checkout');
+
+  // Save an address for the user.
+  $new_profile = commerce_customer_profile_new('billing');
+  $profile_wrapper = entity_metadata_wrapper('commerce_customer_profile', $new_profile);
+  $profile_wrapper->uid = $user->uid;
+  $profile_wrapper->commerce_customer_address->country = rmets_membership_purchase_convert_country_name_to_country_code($user_wrapper->getCountry());
+  $profile_wrapper->commerce_customer_address->name_line = $user_wrapper->getForename() . ' ' . $user_wrapper->getSurname();
+  $profile_wrapper->commerce_customer_address->first_name = $user_wrapper->getForename();
+  $profile_wrapper->commerce_customer_address->last_name = $user_wrapper->getSurname();
+  //$profile_wrapper->commerce_customer_address->organisation_name = $organisation;
+  $profile_wrapper->commerce_customer_address->administrative_area = $user_wrapper->getStateProvince();
+  //$profile_wrapper->commerce_customer_address->sub_administrative_area = $sub_administrative_area;
+  $profile_wrapper->commerce_customer_address->locality = $user_wrapper->getCity();
+  //$profile_wrapper->commerce_customer_address->dependent_locality = $dependent_locality;
+  $profile_wrapper->commerce_customer_address->postal_code = $user_wrapper->getPostCode();
+  $profile_wrapper->commerce_customer_address->thoroughfare = $user_wrapper->getAddress1();
+  $profile_wrapper->commerce_customer_address->premise = $user_wrapper->getAddress2();
+  commerce_customer_profile_save($new_profile);
+  $order->commerce_customer_billing['und'][0]['profile_id'] = $new_profile->profile_id;
+
+  $order->mail = $user->mail;
+
+  // Save the order to get its ID.
+  commerce_order_save($order);
+
+  // Make a line item containing the product.
+  $line_item = commerce_product_line_item_new($product, 1, $order->order_id, $data, 'rmets_events_smartimpact');
+
+  // Save the line item to get its ID.
+  commerce_line_item_save($line_item);
+
+  // If the user is not logged in, ensure the order ID is stored in the session.
+  if (!$user->uid) {
+    commerce_cart_order_session_save($order->order_id);
+  }
+
+  // Add the line item to the order using fago's rockin' wrapper.
+  $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
+  $order_wrapper->commerce_line_items[] = $line_item;
+
+  // Save the order again to update its line item reference field.
+  commerce_order_save($order);
+
+  // Redirect to the order's checkout form. Obviously, if this were a
+  // form submit handler, you'd just set $form_state['redirect'].
+  drupal_goto('checkout/' . $order->order_id);
+}
+
+function rmets_events_get_commerce_product() {
+  return commerce_product_load_by_sku('SMRT/Event');
+}
+
+/**
+ * Implements hook_commerce_cart_line_item_refresh().
+ *
+ * Alter the price in basket and checkout.
+ */
+function rmets_events_commerce_cart_line_item_refresh($line_item, $order_wrapper) {
+  if ($line_item->line_item_label == 'SMRT/Event') {
+    $price = $line_item->data['price_to_pay'] * 100;
+    $line_item->commerce_unit_price[LANGUAGE_NONE]['0']['amount'] = $price;
+    //alter the base_price component
+    $line_item->commerce_unit_price[LANGUAGE_NONE]['0']['data']['components']['0']['price']['amount'] = $price;
+  }
+}
+
+/**
+ * Implements hook_commerce_line_item_type_info_alter().
+ */
+function rmets_events_commerce_line_item_type_info_alter(&$line_item_types) {
+  $line_item_types['rmets_events_smartimpact']['callbacks']['title'] = 'rmets_events_smartimpact_product_title';
+}
+
+function rmets_events_smartimpact_product_title($line_item) {
+  return $line_item->data['title_of_item'];
+}
+
+/**
+ * Implements hook_commerce_smartimpact().
+ */
+function rmets_events_commerce_smartimpact($order) {
+  $order_wrapper = entity_metadata_wrapper("commerce_order", $order);
+  $line_item_id = $order_wrapper->commerce_line_items[0]->line_item_id->value();
+  if (is_numeric($line_item_id) && $line_item_id > 0) {
+    $line_item = commerce_line_item_load($line_item_id);
+  }
+  if (isset($line_item->data['fees']) && $line_item->type == 'rmets_events_smartimpact') {
+    rmets_events_create_event_registration($line_item->data);
+  }
+}
+
+/**
+ * Implements hook_mail().
+ */
+function rmets_events_mail($key, &$message, $params) {
+  $message['subject'] = $params['subject'];
+  $message['body'][] = $params['body'];
+}
+
+/**
+ * Implements hook_field_extra_fields().
+ */
+function rmets_events_field_extra_fields() {
+  $extra['node']['event']['display']['event_schedule'] = array(
+    'label' => t('Event Schedule'),
+    'description' => t('Show an events schedule of sessions, session items.'),
+    'weight' => 0,
+  );
+  return $extra;
+}
+
+/**
+ * Implements hook_theme().
+ */
+function rmets_events_theme() {
+  $path = drupal_get_path('module', 'rmets_events') . '/theme';
+
+  return array(
+    'rmets_events_abstract' => array(
+      'path' => $path,
+      'template' => 'rmets-events-abstract',
+    ),
+  );
+}
+
+/**
+ * Implements hook_node_view().
+ */
+function rmets_events_node_view($node, $view_mode, $langcode) {
+  if ($node->type !== 'event') {
+    return;
+  }
+  if (!in_array($view_mode, array('full', 'print'))) {
+    return;
+  }
+
+  $event_wrapper = new EventWrapper($node);
+  $crm_event_id = $event_wrapper->getEventId();
+
+  // Check if the programme has been set to display.
+  if (!$event_wrapper->field_event_display_programme->value()) {
+    return;
+  }
+
+  // Check if this is an old event.
+  if (empty($crm_event_id)) {
+    return;
+  }
+
+  $crm_event_sessions = $event_wrapper->getCrmEventSessions();
+  $event_sessions = array();
+  foreach ($crm_event_sessions as $session) {
+    /** @var EventSession $session */
+    $event_sessions[$session->getStartDateAsTimestamp()] = $session;
+  }
+  ksort($event_sessions);
+
+  $crm_event_session_items = $event_wrapper->getCrmEventSessionItems();
+  $event_session_items = array();
+  foreach ($crm_event_session_items as $session_item) {
+    /** @var EventSessionItem $session_item */
+    $sort_key = $session_item->getStartDateTimeAsTimestamp() . '-' . drupal_strtolower(str_replace(' ', '-', $session_item->getName()));
+    $event_session_items[$session_item->getSessionID()][$sort_key] = $session_item;
+  }
+
+  if (empty($event_session_items)) {
+    return;
+  }
+
+  $crm_event_speakers = $event_wrapper->getCrmEventSpeakers();
+  $event_speakers = array();
+  foreach ($crm_event_speakers as $speaker) {
+    /** @var EventSpeaker $speaker */
+    $event_speakers[$speaker->getAbstractID()] = $speaker;
+  }
+
+  $schedule = '';
+
+  if (!empty($event_sessions)) {
+    // Build the table for sessions and session items.
+    $header = array('Time', 'Title', 'Speaker');
+    foreach ($event_sessions as $session) {
+      /** @var EventSession $session */
+      $date = date('jS M Y H:i', $session->getStartDateAsTimestamp());
+      if (date('Ymd', $session->getStartDateAsTimestamp()) != date('Ymd', $session->getEndDateAsTimestamp())) {
+        $date .= ' - ' . date('jS M Y H:i', $session->getEndDateAsTimestamp());
+      }
+      elseif (date('YmdHi', $session->getStartDateAsTimestamp()) != date('YmdHi', $session->getEndDateAsTimestamp())) {
+        $date .= ' - ' . date('H:i', $session->getEndDateAsTimestamp());
+      }
+      $schedule .= "<h3>{$session->getName()}</h3>";
+      $schedule .= $date;
+      if (!empty($session->getRoom())) {
+        $schedule .= ', ' . $session->getRoom();
+      }
+      if (!empty($session->getSessionChair())) {
+        $schedule .= '<br><strong>Session Chair</strong>: ' . $session->getSessionChair();
+      }
+
+      $rows = array();
+      if (isset($event_session_items[$session->getSessionId()])) {
+        $session_items = $event_session_items[$session->getSessionId()];
+        ksort($session_items);
+        $schedule .= '<br/><a href="#" id="event-schedule-link-' . $session->getSessionId() . '"  onclick="return false;" class="button-link"><span>Show</span> session schedule</a><div id="event-schedule-' . $session->getSessionId() . '" class="collapseable-table">';
+        foreach ($session_items as $session_item) {
+          /** @var EventSessionItem $session_item */
+          $speaker = $session_item->getSpeakerName();
+          $name = $session_item->getName();
+          if (!empty($session_item->getAbstractID()) && isset($event_speakers[$session_item->getAbstractID()])) {
+            $speaker = $event_speakers[$session_item->getAbstractID()]->getSalutation();
+            $name = l($name, 'event/' . $session_item->getEventID() . '/abstract/' . $session_item->getAbstractID());
+          }
+          $rows[] = array(
+            date('H:i', $session_item->getStartDateTimeAsTimestamp()),
+            $name,
+            $speaker,
+          );
+        }
+        $schedule .= theme('table', array(
+          'header' => $header,
+          'rows' => $rows,
+          'sticky' => FALSE,
+        ));
+        $schedule .= '</div>';
+      }
+      else {
+        $schedule .= '<hr/>';
+      }
+    }
+  }
+
+  $node->content['event_schedule']['#markup'] = $schedule;
+}
+

@@ -1,0 +1,11 @@
+name = "Commerce Gift Aid"
+description = "Enable the recording of customer UK gift aid declarations on orders.'
+core = "7.x"
+package = "Commerce"
+php = "5.2.4"
+dependencies[] = "commerce"
+dependencies[] = "commerce_product"
+dependencies[] = "commerce_order"
+dependencies[] = "commerce_checkout"
+dependencies[] = "entity"
+dependencies[] = "rules"

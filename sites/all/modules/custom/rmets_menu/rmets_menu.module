@@ -1,0 +1,205 @@
+<?php
+
+/**
+ * @file
+ */
+
+/**
+ * Implements hook_menu().
+ */
+function rmets_menu_megamenu() {
+  $menu_key = arg(1);
+  $menu = rmets_menu_get_megamenu($menu_key);
+  print $menu;
+  exit;
+}
+
+/**
+ * Get the mega menu from cache, otherwise generate it.
+ */
+function rmets_menu_get_megamenu($menu_key) {
+  $menu = cache_get('rmets_menu_megamenu_' . $menu_key, 'cache_menu');
+  if (isset($menu->data)) {
+    $menu = $menu->data;
+  }
+  else {
+    $menu = FALSE;
+  }
+  if (!$menu) {
+    $menu = rmets_menu_menu_navigation_links('main-menu', $menu_key);
+    cache_set('rmets_menu_megamenu_' . $menu_key, $menu, 'cache_menu', CACHE_TEMPORARY);
+  }
+  return $menu;
+}
+
+/**
+ * This function generates a single megamenu div
+ */
+function rmets_menu_menu_navigation_links($menu_name, $start) {
+  // The tree object stores the structure of the main menu.
+  $tree = &drupal_static(__FUNCTION__ . 'tree');
+
+  // The nid_access array will store a list of nids in the main
+  // menu that the user does have access to.
+  $nid_access = &drupal_static(__FUNCTION__ . 'nid_access');
+
+  require_once('modules/menu/menu.admin.inc');
+  global $menu_admin;
+  $menu = array();
+
+  if (!isset($tree)) {
+    $sql = "
+      SELECT m.load_functions, m.to_arg_functions, m.access_callback, m.access_arguments, m.page_callback, m.page_arguments, m.delivery_callback, m.title, m.title_callback, m.title_arguments, m.type, m.description, ml.*
+      FROM {menu_links} ml LEFT JOIN {menu_router} m ON m.path = ml.router_path
+      WHERE ml.menu_name = :menu AND hidden=0
+      ORDER BY p1 ASC, p2 ASC, p3 ASC, p4 ASC, p5 ASC, p6 ASC, p7 ASC, p8 ASC, p9 ASC";
+    $result = db_query($sql, array(':menu' => $menu_name), array('fetch' => PDO::FETCH_ASSOC));
+    $links = array();
+    foreach ($result as $item) {
+      $links[] = $item;
+    }
+
+    $tree = menu_tree_data($links);
+    $node_links = array();
+    menu_tree_collect_node_links($tree, $node_links);
+
+    // NIDs listed inside of the nid_access array the user
+    // can access.
+    $nid_access = array();
+    if (!empty($node_links)) {
+      // Work out access to menu items en mass.
+      $nids = array_keys($node_links);
+      $select = db_select('node', 'n');
+      $select->addField('n', 'nid');
+      $select->condition('n.status', 1);
+      $select->condition('n.nid', $nids, 'IN');
+      $select->addTag('node_access');
+      $nid_access = $select->execute()->fetchCol();
+    }
+
+    // Set access to TRUE on the menu for all published content.
+    // so _menu_tree_check_access won't remove restricted
+    // items we want to show with a padlock.
+    // @see menu_tree_check_access($tree, $node_links);
+    if ($node_links) {
+      $nids = array_keys($node_links);
+      $select = db_select('node', 'n');
+      $select->addField('n', 'nid');
+      $select->condition('n.status', 1);
+      $select->condition('n.nid', $nids, 'IN');
+      $nids = $select->execute()->fetchCol();
+
+      foreach ($nids as $nid) {
+        foreach ($node_links[$nid] as $mlid => $link) {
+          $node_links[$nid][$mlid]['access'] = TRUE;
+        }
+      }
+    }
+
+    // We indicate that a menu administrator is running the menu access check.
+    $menu_admin = TRUE;
+    _menu_tree_check_access($tree);
+    $menu_admin = FALSE;
+  }
+
+  $menu = array_merge($menu, _menu_overview_tree_form($tree));
+
+  $out = array();
+  $output = '';
+  $started = FALSE;
+
+  foreach ($menu as $m) {
+    $me = $m['#item'];
+    if ($me['depth']) {
+      if ($me['mlid'] == $start) {
+        $output .= '<span class="key">Member-only content</span>';
+        $output .= '<div class="title">' . check_plain($me['link_title']) . '</div>';
+        $started = $me['depth'];
+      }
+      elseif ($started && $started >= $me['depth']) {
+        break;
+      }
+      elseif ($me['mlid'] != $start) {
+        if (!$started) {
+          continue;
+        }
+      }
+
+      $can_access = TRUE;
+      if ($me['router_path'] == 'node/%') {
+        $menu = explode('/', $me['link_path']);
+        $nid = $menu[1];
+        $node = node_load($nid);
+        $can_access = !isset($node->field_rmets_access) ? TRUE : (entity_metadata_wrapper('node', $node)->field_rmets_access->value() == 0);
+      }
+
+      $out[] = array('mlid' => $me['mlid'], 'href' => $me['link_path'], 'name' => $me['link_title'], 'depth' => $me['depth'], 'access' => $can_access);
+    }
+  }
+
+  $prev = 1;
+  $lis = array();
+  $titles = array();
+  $count = 0; $open = 0; $closed = 0;
+
+  foreach ($out as $id => $menu_item) {
+    if ($menu_item['depth'] == 2) {
+      $titles[$count][] = '<div class="group-title">' . l($menu_item['name'], $menu_item['href'], array('absolute' => TRUE)) . '</div>' . "\n";
+      $count++;
+    }
+    elseif ($menu_item['depth'] == 3) {
+      $access = ($menu_item['access']) ? '' : '<span class="members"></span>';
+      $lis[$count - 1][] = '<li>' . $access . l($menu_item['name'], $menu_item['href'], array('absolute' => TRUE)) . '</li>' . "\n";
+    }
+  }
+
+  $columns = 3;
+  $divider = floor(count($titles) / $columns);
+  $extra = (count($titles) - ($divider * $columns));
+
+  $counts = array();
+  $total = 0;
+  foreach ($titles AS $id => $title) {
+    $counts[$id] = count($title);
+    if (isset($lis[$id])) {
+       $counts[$id] += count($lis[$id]);
+    }
+    $total += $counts[$id];
+  }
+
+  $count = 0;
+  $group_count = 0;
+  $link_count = 0;
+  $cols = array('');
+  foreach ($titles AS $id => $title) {
+    $cols[$count] .= '<div class="section-group">' . implode('', $title);
+    if (!empty($lis[$id])) {
+      $cols[$count] .=  '<ul>' . implode('', $lis[$id]) . '</ul>';
+    }
+    $cols[$count] .= '</div>';
+    $link_count += $counts[$id];
+    $cols[$count] .= "<!--$link_count $total $group_count $divider-->";
+    $group_count++;
+
+    // Dark arts to work out columns follow...
+
+    //If we have more links than average
+    $more_links_than_average = ($link_count >= ($total / $columns));    
+    // If we have more groups than average
+    $more_groups_than_average = ($group_count >= $divider);    
+    // If adding the next column will give us more groups than average    
+    $adding_the_next_column_gives_more_than_average = ((isset($counts[$id + 1]) && ($link_count + $counts[$id + 1] - 2) >= ($total / $columns)));
+    // If we have less than 4 columns and more links than average, start a new one. Also if we have less links than average but adding the
+    // next column will give us a couple more links than average, we start a new column too.
+    if ($count < ($columns - 1) && ($more_links_than_average || ($more_groups_than_average && $adding_the_next_column_gives_more_than_average))) {
+    //    if ($count < ($columns - 1) && ($link_count >= ($total / $columns) || ($group_count >= $divider && isset($counts[$id + 1]) && (($link_count + $counts[$id + 1] - 2) >= ($total / $columns))))) {      
+      $count++;
+      $cols[$count] = '';
+      $link_count = 0;
+      $group_count = 0;
+    }
+  }
+
+  $output = '<div class="col">' . implode('</div><div class="col">', $cols) . '</div>';
+  return $output;
+}

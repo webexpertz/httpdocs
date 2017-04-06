@@ -1,0 +1,32 @@
+<?php
+
+/**
+ * @file rmets_cpd_reviews.install
+ */
+
+/**
+ * Update the the system table so rmets cpd reviews' hooks are fired after the system module's hooks.
+ */
+function rmets_cpd_reviews_update_7101(&$sandbox) {
+
+  $updated = db_update('system')
+    ->fields(array(
+      'weight' => 2,
+    ))
+    ->condition('name', 'rmets_cpd_reviews')
+    ->execute();
+
+  if ($updated == 1) {
+    return t('The CPD review module successfully made it\'s system table update.');
+  } else {
+    throw new DrupalUpdateException('The CPD review module failed making it\'s system table update. You should apply this manually');
+  }
+
+}
+
+/**
+ * Feature update for changes to views.
+ */
+function rmets_cpd_reviews_update_7113() {
+  features_revert(array('rmets_cpd_reviews' => array('rmets_cpd_reviews_features')));
+}

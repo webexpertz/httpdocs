@@ -1,0 +1,19 @@
+<?php
+
+/**
+* @file
+ * Install and update hooks.
+ */
+
+/**
+ * Update the news home page block.
+ */
+function rmets_news_update_7001() {
+  features_revert(
+    array(
+      'rmets_news' => array(
+        'views_view',
+      ),
+    )
+  );
+}

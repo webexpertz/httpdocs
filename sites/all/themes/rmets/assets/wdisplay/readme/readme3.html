@@ -1,0 +1,111 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+	<head>
+		<title>Weather Display Live</title>
+		<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+	    <link href="readme.css" rel="stylesheet" type="text/css" />
+	</head>
+	<body id="tab4">
+		<h1>Weather Display Live - Getting Started
+		</h1>
+		<ul id="tabnav">
+			<li class="tab1"><a href="readme.html">Overview</a></li>
+			<li class="tab2"><a href="readme1.html">Installation</a></li>
+			<li class="tab3"><a href="readme2.html">Upgrading</a></li>
+			<li class="tab4"><a href="readme3.html">Configuring</a></li>
+			<li class="tab5"><a href="readme4.html">Purchasing</a></li>
+			<li class="tab6"><a href="readme5.html">Troubleshooting</a></li>
+			<li class="tab7"><a href="readme6.html">Releases</a></li>	
+		</ul>
+
+		<h3>Basic Configuring</h3>
+		<p>The wdlconfig.xml file allows many options to be set for Weather Display Live.
+			It is an xml file which allows for great flexibility but care when altering it
+			is required. The slightest typo can stop the software working. It is
+			recommended you make a backup before amending any details. In addition the file
+			is case sensitive! </p>
+		<p><strong>It is recommended that you use the WDL Configurator to modify your configuration.</strong></p>
+		<p>However the configuration file can be modified 'by hand' quite easily, especially for minor changes. The main thing to remember is to make a backup before you start manually editing it!  </p>
+		<p>Open the wdlconfig.xml files in a text editor, such as
+		  Notepad, and have a look at the contents within it. Each configuration option is
+		  specified on a new line. For a comprehensive guide to customising Weather
+		  Display Live see the <a href="../configuring_wdl.pdf">configuring_wdl.pdf</a> file.
+		  Here are a few of the most useful tags to get you started.</p>
+		<p>If you wish to place index.html, wdlconfig.xml and wdlv6_02.swf files in a
+			different location than the clientraw.txt, clientrawextra.txt, clientrawhour.txt and
+			clientrawdaily.txt files then you can specify their location by amending the
+			lines -
+		</p>
+		<blockquote>
+			<p>&lt;clientraw&gt;&lt;/clientraw&gt;<br>
+				&lt;clientrawextra&gt;&lt;/clientrawextra&gt;<br>
+				&lt;clientrawdaily&gt;&lt;/clientrawdaily&gt;
+                <br />
+          &lt;clientrawhour&gt;&lt;/clientrawhour&gt;</p>
+	</blockquote>
+		<p>Enter the full path to the files ie
+			http://www.mywebsite.com/weather/data/clientraw.txt and
+			http://www.mywebsite.com/weather/data/clientrawextra.txt as appropriate -</p>
+		<blockquote>
+		  <p>&lt;clientraw&gt;http://www.mywebsite.com/weather/data/clientraw.txt&lt;/clientraw&gt;<br />
+&lt;clientrawextra&gt;http://www.mywebsite.com/weather/data/clientrawextra.txt&lt;/clientrawextra&gt;<br />
+&lt;clientrawdaily&gt;http://www.mywebsite.com/weather/data/clientrawdaily.txt&lt;/clientrawdaily&gt;<br />
+&lt;clientrawhour&gt;http://www.mywebsite.com/weather/data/clientrawhour.txt&lt;/clientrawhour&gt;		  </p>
+    </blockquote>
+		<p>To change an option such as the temperature units that Weather Display Live
+			  starts with find the line -</p>
+		<blockquote>
+			<p>&lt;initTempUnits&gt;C&lt;/initTempUnits&gt;
+			</p>
+		</blockquote>
+		<p align="left">Change it so that it now reads -</p>
+		<blockquote>
+			<p>&lt;initTempUnits&gt;F&lt;/initTempUnits&gt;
+			</p>
+		</blockquote>
+		<p>Be careful when changing settings in this file as you can easily stop Weather
+			Display Live from working with the smallest of typing mistakes. The xml file is
+			case sensitive! Refresh your web page to reload Weather Display Live and see
+			the new temperature units.</p>
+		<p>In the same way you can change the barometric pressure, rainfall, altitude and
+			wind units at start up.</p>
+		<p>It is recommended that you set the frequency with which Weather Display Live
+			attempts to update data to be the same as the clientraw.txt file gets updated
+			from Weather Display. Therefore if Weather Display sends a new clientraw.txt
+			file every 10 seconds change the line that says -</p>
+		<blockquote>
+			<p>&lt;refresh&gt;4&lt;/refresh&gt;
+			</p>
+		</blockquote>
+		<p>to say -
+		</p>
+		<blockquote>
+			<p>&lt;refresh&gt;10&lt;/refresh&gt;
+			</p>
+		</blockquote>
+		<p>If after changing this setting or any other in the wdlconfig.xml file your
+			browser does not reflect the change see the <a href="readme5.html">troubleshooting</a>
+			section.</p>
+		<p>The full set of configuration tags in the wdlconfig.xml file and comprehensive
+			instructions for customising Weather Display Live to look exactly the way you
+			want are described in the <a href="../configuring_wdl.pdf">configuring_wdl.pdf</a>
+			guide included in the installation folder.
+		There are also a number of sample files available for you to use or modify in the Weather Display Live installation folder. </p>
+		<p>You can change the size of Weather Display Live by amending the width and height
+			tags in the index.html file. For example if you wish to make the display a
+			fixed size enter the values 550 and 400 for width and height respectively.
+			Alternatively you can make Weather Display Live automatically fill the screen
+			by setting the values to a percentage. Enter 100% for both the width and height
+			tags. It's best to keep the values relative to each other or the display will
+			appear distorted due to the incorrect aspect ratio.</p>
+		<p>You can change the background colour of the display or place a background image
+			by changing the &lt;body style=&quot;background:#ffffff"&gt; tag. For example to give Weather
+			Display Live a yellow background you would change the tag to &lt;body style=&quot;background:#ffff00"&gt;. For more information on any of this visit the Flash
+			pages on the Adobe website <sup><a href="#4"></a></sup> or any decent
+			html book.</p>
+		<p><a href="readme4.html" class="style5">Purchasing &gt;&gt; </a>		</p>
+		<p>&nbsp;</p>
+		<p>&nbsp;</p>
+		<p align="center" class="small">© Julian Best 2008</p>
+	</body>
+</html>

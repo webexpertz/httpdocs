@@ -1,0 +1,25 @@
+name = Rmets
+description = "A flexible, recolorable theme with many regions."
+version = "1.0"
+core = "7.x"
+
+stylesheets[all][] = "assets/css/normalize.css"
+stylesheets[all][] = "assets/css/rmets.css"
+stylesheets[all][] = "assets/css/rmets-client.css"
+
+scripts[] = "assets/js/jquery.cycle.all.js"
+scripts[] = "assets/js/jquery.carouFredSel-5.6.0-packed.js"
+scripts[] = "assets/js/rmets.js"
+
+regions[header] = "Header"
+regions[help] = "Help"
+regions[page_top] = "Page top"
+regions[page_bottom] = "Page bottom"
+regions[highlighted] = "Highlighted"
+regions[content] = "Content"
+regions[sidebar_first] = "Sidebar first"
+regions[search] = "Search facets"
+regions[sidebar_second] = "Sidebar second"
+regions[footer] = "Footer"
+
+settings[shortcut_module_link] = 0

@@ -1,0 +1,318 @@
+<?php
+
+/**
+ * @file
+ * Install and update hooks.
+ */
+
+/**
+ * Relate listing views to the field_user field.
+ */
+function rmets_cpd_records_features_update_7001() {
+  features_revert(
+    array(
+      'rmets_cpd_records_features' => array(
+        'views_view',
+      ),
+    )
+  );
+}
+
+/**
+ * CPD add a view for listing records attached to an application or review.
+ */
+function rmets_cpd_records_features_update_7002() {
+  features_revert(
+    array(
+      'rmets_cpd_records_features' => array(
+        'views_view',
+      ),
+    )
+  );
+}
+
+/**
+ * Removed the other button for adding objectives and rcords when there are no results
+ */
+function rmets_cpd_records_features_update_7003() {
+  features_revert(
+    array(
+      'rmets_cpd_records_features' => array(
+        'views_view',
+      ),
+    )
+  );
+}
+
+/**
+ * Added breadcrumbs to records and objectives view page.
+ */
+function rmets_cpd_records_features_update_7004() {
+  features_revert(
+    array(
+      'rmets_cpd_records_features' => array(
+        'path_breadcrumbs',
+      ),
+    )
+  );
+}
+
+/**
+ * Removed repeated headers on record and objective views.
+ */
+function rmets_cpd_records_features_update_7005() {
+  features_revert(
+    array(
+      'rmets_cpd_records_features' => array(
+        'field',
+        'field_instance',
+        'ds_field_settings',
+        'ds_fields',
+        'ds_layout_settings',
+      ),
+    )
+  );
+}
+
+/**
+ * Make objective references links.
+ */
+function rmets_cpd_records_features_update_7006() {
+  features_revert(
+    array(
+      'rmets_cpd_records_features' => array(
+        'field',
+        'field_instance',
+        'ds_field_settings',
+        'ds_fields',
+        'ds_layout_settings',
+      ),
+    )
+  );
+}
+
+/**
+ * Make objectives and records text fields member only filter.
+ * Make the date fields have sensible date ranges!
+ */
+function rmets_cpd_records_features_update_7008() {
+  features_revert(
+    array(
+      'rmets_cpd_records_features' => array(
+        'field',
+        'field_instance',
+      ),
+    )
+  );
+}
+
+/**
+ * Added the print display for report.
+ */
+function rmets_cpd_records_features_update_7009() {
+  features_revert(
+    array(
+      'rmets_cpd_records_features' => array(),
+    )
+  );
+}
+
+/**
+ * Updated the order of the cpd record tab.
+ */
+function rmets_cpd_records_features_update_7010() {
+  features_revert(
+    array(
+      'rmets_cpd_records_features' => array(
+        'views_view',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated the cpd record reviewer view.
+ */
+function rmets_cpd_records_features_update_7011() {
+  features_revert(
+    array(
+      'rmets_cpd_records_features' => array(
+        'field',
+        'field_instance',
+        'field_group',
+        'views_view',
+        'ds_fields',
+        'ds_field_settings',
+        'ds_layout_settings',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated print view of records.
+ * Added reviewer breadcrumbs.
+ */
+function rmets_cpd_records_features_update_7012() {
+  features_revert(
+    array(
+      'rmets_cpd_records_features' => array(
+        'path_breadcrumbs',
+        'views_view',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated views with new column & updated filters.
+ */
+function rmets_cpd_records_features_update_7013() {
+  features_revert(
+    array(
+      'rmets_cpd_records_features' => array(
+        'views_view',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated date field to go back 100 years.
+ */
+function rmets_cpd_records_features_update_7014() {
+  features_revert(
+    array(
+      'rmets_cpd_records_features' => array(
+        'field',
+        'field_instance',
+      ),
+    )
+  );
+}
+
+/**
+ * Added 'link' field to the cpd_records view.
+ * Updated title text on view listings.
+ */
+function rmets_cpd_records_features_update_7015() {
+  features_revert(
+    array(
+      'rmets_cpd_records_features' => array(
+        'ds_fields',
+        'ds_field_settings',
+        'ds_layout_settings',
+        'views_view',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated default sort order.
+ */
+function rmets_cpd_records_features_update_7016() {
+  features_revert(
+    array(
+      'rmets_cpd_records_features' => array(
+        'views_view',
+      ),
+    )
+  );
+}
+
+/**
+ * Allowed users to delete own CPD records
+ */
+function rmets_cpd_records_features_update_7017() {
+  features_revert(
+    array(
+      'rmets_cpd_records_features' => array(
+        'views_view',
+      ),
+    )
+  );
+}
+
+/**
+ * Added PDF download link to CPD records
+ */
+function rmets_cpd_records_features_update_7018() {
+  features_revert(
+    array(
+      'rmets_cpd_records_features' => array(
+        'views_view',
+      ),
+    )
+  );
+}
+
+/**
+ * Allowed users permission to delete own CPD records
+ */
+function rmets_cpd_records_features_update_7019() {
+  features_revert(
+    array(
+      'rmets_cpd_records_features' => array(
+        'views_view',
+      ),
+    )
+  );
+}
+
+/**
+ * Added export to CSV button
+ */
+function rmets_cpd_records_features_update_7020() {
+  features_revert(
+    array(
+      'rmets_cpd_records_features' => array(
+        'views_view',
+      ),
+    )
+  );
+}
+
+/**
+ * Added .csv to view export
+ */
+function rmets_cpd_records_features_update_7021() {
+  features_revert(
+    array(
+      'rmets_cpd_records_features' => array(
+        'views_view',
+      ),
+    )
+  );
+}
+
+
+function rmets_cpd_records_features_update_7022() {
+  $report_nodes = db_query("
+    SELECT p.*, n.type FROM {print_pdf_node_conf} p 
+    JOIN {node} n ON n.nid=p.nid 
+    WHERE n.type='cpd_report_review'"
+  );
+  foreach ($report_nodes AS $node) {
+    db_update('print_pdf_node_conf')
+      ->fields(array(
+        'link' => 1,
+        'url_list' => 1,
+      ))
+      ->condition('nid', $node->nid)
+      ->execute();
+  }
+}
+
+/**
+ * Updated text in view.
+ */
+function rmets_cpd_records_features_update_7023() {
+  features_revert(
+    array(
+      'rmets_cpd_records_features' => array(
+        'views_view',
+      ),
+    )
+  );
+}

@@ -1,0 +1,7 @@
+name = "RMets Menu"
+description = The RMetS Menu
+core = 7.x
+package = RMetS
+scripts[]=assets/js/jquery.bgiframe.min.js
+scripts[]=assets/js/rmets_menu.js
+scripts[]=assets/js/hoverIntent.js

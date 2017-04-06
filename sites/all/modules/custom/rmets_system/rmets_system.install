@@ -1,0 +1,4 @@
+<?php
+function rmets_system_update_7005() {
+  features_revert_module('rmets_system');
+}

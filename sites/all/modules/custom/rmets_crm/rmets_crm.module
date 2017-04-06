@@ -1,0 +1,375 @@
+<?php
+
+/**
+ * @file
+ * MS Dynamics integration for RMetS CRM.
+ */
+
+use Drupal\rmets_membership_user\EntityWrapper\User\UserWrapper;
+
+use Drupal\rmets_crm\Api\Request\GetAllAwardsCategoriesRequest;
+use Drupal\rmets_crm\Api\Request\GetAllAccreditationCategoriesRequest;
+use Drupal\rmets_crm\Api\Request\OptionsetRequest;
+use Drupal\rmets_crm\Api\Request\GetAllCommitteesRequest;
+use Drupal\rmets_crm\Api\Request\InvalidRequestException;
+use Drupal\rmets_crm\Api\ApiServerException;
+use Drupal\rmets_crm\Api\CrmService;
+use Drupal\rmets_crm\Model\AwardCategory;
+use Drupal\rmets_crm\Model\Accreditation;
+
+/**
+ * Implementation of hook_init().
+ * Admins get to see a message that the membership database is unavailable.
+ */
+function rmets_crm_init() {
+  if (user_access('administer crm') && (!isset($_GET['q']) || stripos($_GET['q'], 'rmets_membership_user') === FALSE ) && variable_get_value('wsif-rmets_crm-unavailable')) {
+    drupal_set_message( t('The MS Dynamics membership database is unavailable !link', array('!link' => l('MsDynamics Settings', 'admin/config/system/variable/module/wsif'))), 'error', FALSE);
+  }
+}
+
+/**
+ * Implements hook_permission().
+ */
+function rmets_crm_permission() {
+  $permissions = array(
+    'edit other users crm membership details' => array(
+      'title' => t('Edit other users membership details'),
+      'description' => t('Only give this to admins.'),
+    ),
+    'edit crm membership numbers' => array(
+      'title' => t('Edit users membership numbers'),
+      'description' => t('The membership number field links a user account in Drupal to the ContactID in CRM.'),
+    ),
+    'administer crm' => array(
+      'title' => t('Administer CRM'),
+      'description' => t('Administer CRM connections'),
+    ),
+  );
+
+  return $permissions;
+}
+
+/**
+ * Implements hook_wsif_info().
+ */
+function rmets_crm_wsif_info() {
+  return array(
+    CrmService::WSIF_API_NAME => array(
+      'name' => t('RMetS CRM'),
+      'description' => t('Integration between this site and the RMetS MS Dynamics platform.'),
+      'machine_name' => 'ms_dynamics',
+      'extra' => 'Connection endpoint: ' . variable_get('rmets_crm_api_endpoint', ''),
+    ),
+  );
+}
+
+/**
+ * Implements hook_wsif().
+ */
+function rmets_crm_wsif() {
+  // Make Guzzle available.
+  xautoload()->adapter->composerDir(drupal_get_path('module', 'rmets_crm') . '/vendor/composer');
+
+  $driver_class = variable_get('rmets_crm_api_driver', 'Drupal\rmets_crm\Api\Driver\MsDynamics');
+  $endpoint_url = variable_get('rmets_crm_api_endpoint');
+  $log_type = variable_get('rmets_crm_api_log_type', 0);
+  $log_path = variable_get('rmets_crm_api_log_path', '');
+
+  /** @var \Drupal\rmets_crm\Api\Driver\DriverInterface $driver */
+  $driver = new $driver_class(array(
+    'base_url' => $endpoint_url,
+    'cache_bin' => 'cache_crm',
+    'log_type' => $log_type,
+    'log_path' => $log_path,
+  ));
+
+  return new CrmService($driver);
+}
+
+/**
+ * Get the service instance for integrating with MS Dynamics.
+ *
+ * This function serves as the dependency injection root.
+ *
+ * @param boolean $reset
+ *
+ * @return CrmService
+ *
+ * @throws \Drupal\rmets_crm\Api\ApiServerException
+ *   When the API is turned off or otherwise unavailable.
+ */
+function rmets_crm_get_api($reset = FALSE) {
+  try {
+    return wsif_get_api(CrmService::WSIF_API_NAME, $reset);
+  }
+  catch (WSIFUnavailableException $ex) {
+    // Pass back the WSIF exception without fault incrementing since the wsif
+    // call will have done that. This makes our exceptions more catchable.
+    throw new ApiServerException($ex->getMessage(), FALSE, $ex);
+  }
+}
+
+/**
+ * Implements hook_flush_caches().
+ */
+function rmets_crm_flush_caches() {
+  return array('cache_crm');
+}
+
+/**
+ * Load a user object from it's membership number.
+ *
+ * @param string $membership_number
+ *   The membership number.
+ *
+ * @return user
+ *   The user account object or FALSE if there isn't one.
+ */
+function rmets_crm_user_load_by_membership_number($membership_number) {
+  if (empty($membership_number)) {
+    return FALSE;
+  }
+
+  try {
+    $query = new EntityFieldQuery();
+    $result = $query->entityCondition('entity_type', 'user')
+      ->fieldCondition('field_membership_number', 'value', $membership_number, '=')
+      ->execute();
+
+    if (isset($result['user'])) {
+      $users = entity_load('user', array_keys($result['user']));
+      return reset($users);
+    }
+  }
+  catch (Exception $e) {
+    // Nothing to see here.
+  }
+  return FALSE;
+}
+
+/**
+ * Implements hook_field_widget_info().
+ */
+function rmets_crm_field_widget_info() {
+  return array(
+    'text_crm_award_options' => array(
+      'label' => t('CRM Award list'),
+      'field types' => array('text'),
+      'behaviors' => array(
+        'multiple values' => FIELD_BEHAVIOR_DEFAULT,
+        'default value' => FIELD_BEHAVIOR_DEFAULT,
+      ),
+    ),
+    'text_crm_accreditation_options' => array(
+      'label' => t('CRM Accreditation list'),
+      'field types' => array('text'),
+      'behaviors' => array(
+        'multiple values' => FIELD_BEHAVIOR_DEFAULT,
+        'default value' => FIELD_BEHAVIOR_DEFAULT,
+      ),
+    ),
+    'text_crm_accreditation_item_options' => array(
+      'label' => t('CRM Members Accreditation list'),
+      'field types' => array('text'),
+      'behaviors' => array(
+        'multiple values' => FIELD_BEHAVIOR_DEFAULT,
+        'default value' => FIELD_BEHAVIOR_DEFAULT,
+      ),
+    ),
+    'text_crm_event_types_options' => array(
+      'label' => t('CRM Event Types list'),
+      'field types' => array('text'),
+      'behaviors' => array(
+        'multiple values' => FIELD_BEHAVIOR_DEFAULT,
+        'default value' => FIELD_BEHAVIOR_DEFAULT,
+      ),
+    ),
+    'text_crm_committees_options' => array(
+      'label' => t('CRM Committees list'),
+      'field types' => array('text'),
+      'behaviors' => array(
+        'multiple values' => FIELD_BEHAVIOR_DEFAULT,
+        'default value' => FIELD_BEHAVIOR_DEFAULT,
+      ),
+    ),
+  );
+}
+
+/**
+ * Implements hook_field_widget_form().
+ */
+function rmets_crm_field_widget_form(&$form, &$form_state, $field, $instance, $langcode, $items, $delta, $element) {
+  $widget_types = array_keys(rmets_crm_field_widget_info());
+  if (in_array($instance['widget']['type'], $widget_types)) {
+    $options = array();
+    $function = '_rmets_crm_get_' . $instance['widget']['type'];
+    if (function_exists($function)) {
+      $options = $function($form_state);
+    }
+    $options = array('' => t('- None -')) + $options;
+
+    $element['value'] = $element + array(
+      '#type' => 'select',
+      '#default_value' => isset($items[$delta]['value']) ? $items[$delta]['value'] : NULL,
+      '#options' => $options,
+      '#description' => t('You will have to save this field and return again to set the default value.'),
+    );
+
+  }
+
+  return $element;
+}
+
+/**
+ * Callback function to get the award list from CRM.
+ * @return array
+ */
+function _rmets_crm_get_text_crm_award_options(&$form_state) {
+  $options = array();
+  try {
+    $request = new GetAllAwardsCategoriesRequest();
+    $request->setGuid(variable_get('rmets_crm_api_guid', ''));
+    $request->setPage(1);
+    $request->setRecordCount(100);
+
+    /** @var \Drupal\rmets_crm\Api\CrmService $api */
+    $api = rmets_crm_get_api();
+    $response = $api->getAllAwardsCategories($request);
+    foreach ($response->getIterator() as $category) {
+      /** @var $category AwardCategory */
+      $options[$category->getAwardID()] = $category->getName();
+    }
+  }
+  catch (InvalidRequestException $e) {
+    drupal_set_message($e->getMessage(), 'error');
+  }
+  catch (ApiServerException $apie) {
+    drupal_set_message(t('Unable to connect to our membership database.'), 'error');
+  }
+
+  return $options;
+}
+
+/**
+ * Callback function to get the accreditation list from CRM.
+ * @return array
+ */
+function _rmets_crm_get_text_crm_accreditation_options(&$form_state) {
+  $options = array();
+  try {
+    $request = new GetAllAccreditationCategoriesRequest();
+    $request->setGuid(variable_get('rmets_crm_api_guid', ''));
+    $request->setPage(1);
+    $request->setRecordCount(100);
+
+    /** @var \Drupal\rmets_crm\Api\CrmService $api */
+    $api = rmets_crm_get_api();
+    $response = $api->getAllAccreditationCategories($request);
+    foreach ($response->getIterator() as $category) {
+      /** @var $category Accreditation */
+      $options[$category->getAccreditationID()] = $category->getName();
+    }
+  }
+  catch (InvalidRequestException $e) {
+    drupal_set_message($e->getMessage(), 'error');
+  }
+  catch (ApiServerException $apie) {
+    drupal_set_message(t('Unable to connect to our membership database.'), 'error');
+  }
+
+  return $options;
+}
+
+/**
+ * Callback function to get the accreditation list from CRM.
+ * @return array
+ */
+function _rmets_crm_get_text_crm_accreditation_item_options(&$form_state) {
+  if (isset($form_state['build_info']['args'][0]->uid)) {
+    $account = user_load($form_state['build_info']['args'][0]->uid);
+  }
+  else {
+    global $user;
+    $account = $user;
+  }
+
+  $user_wrapper = new UserWrapper($account);
+  $user_wrapper->updateFromCrm();
+
+  $list = $user_wrapper->getAccreditationApplicationList();
+  if (empty($list) && variable_get('rmets_crm_force_cmet_option', FALSE)) {
+    $list['cmet_fake'] = 'CMet (test)';
+  }
+  return $list;
+}
+
+/**
+ * Callback function to get the event types list from CRM.
+ * @return array
+ */
+function _rmets_crm_get_text_crm_event_types_options(&$form_state) {
+  $options = array();
+  try {
+    $request = new OptionsetRequest();
+    $request->setGuid(variable_get('rmets_crm_api_guid', ''));
+
+    /** @var \Drupal\rmets_crm\Api\CrmService $api */
+    $api = rmets_crm_get_api();
+    $response = $api->optionsetEventsTypes($request);
+    foreach ($response->getIterator() as $option) {
+      /** @var $option \Drupal\rmets_crm\Model\OptionsetObject */
+      $options[$option->getKey()] = $option->getValue();
+    }
+  }
+  catch (InvalidRequestException $e) {
+    drupal_set_message($e->getMessage(), 'error');
+  }
+  catch (ApiServerException $apie) {
+    drupal_set_message(t('Unable to connect to our membership database.'), 'error');
+  }
+
+  return $options;
+}
+
+/**
+ * Callback function to get the event types list from CRM.
+ * @return array
+ */
+function _rmets_crm_get_text_crm_committees_options(&$form_state) {
+  $options = array();
+  try {
+    $request = new GetAllCommitteesRequest();
+    $request->setGuid(variable_get('rmets_crm_api_guid', ''));
+    $request->setPage(1);
+    $request->setRecordCount(100);
+
+    /** @var \Drupal\rmets_crm\Api\CrmService $api */
+    $api = rmets_crm_get_api();
+    $response = $api->getAllCommittees($request);
+    foreach ($response->getIterator() as $option) {
+      /** @var $option \Drupal\rmets_crm\Model\Group */
+      $options[$option->getCommitteeID()] = $option->getName();
+    }
+  }
+  catch (InvalidRequestException $e) {
+    drupal_set_message($e->getMessage(), 'error');
+  }
+  catch (ApiServerException $apie) {
+    drupal_set_message(t('Unable to connect to our membership database.'), 'error');
+  }
+
+  return $options;
+}
+
+/**
+ * Implements hook_mail().
+ */
+function rmets_crm_mail($key, &$message, $params) {
+  switch ($key) {
+    case 'rmets_crm_alert':
+      $message['subject'] = 'CRM ID Mismatch alert';
+      $message['body'][] = 'Expected: ' . $params['expected'];
+      $message['body'][] = 'Received: ' . $params['received'];
+      break;
+  }
+}

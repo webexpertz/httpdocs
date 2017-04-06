@@ -1,0 +1,42 @@
+<?php
+/**
+ * @file
+ * Install file for RMetS CPD accreditation.
+ */
+
+/**
+ * Feature update for changes to views & node content type.
+ */
+function rmets_cpd_accreditation_update_7105() {
+  features_revert(array('rmets_cpd_accreditation' => array('rmets_cpd_accreditation_features')));
+}
+
+/**
+ * Feature update for changes to views & node content type etc.
+ */
+function rmets_cpd_accreditation_update_7108() {
+  features_revert(array('rmets_cpd_accreditation' => array('rmets_cpd_accreditation_features')));
+}
+
+/**
+ * Create generic accreditation application product.
+ */
+function rmets_cpd_accreditation_update_7109() {
+  $product = commerce_product_new(RMETS_CPD_ACCREDITATION_PRODUCT_TYPE);
+  $product->sku = RMETS_CPD_ACCREDITATION_PRODUCT_SKU;
+  $product->title = 'Accreditation Application Product';
+  $product->language = LANGUAGE_NONE;
+  $product->commerce_price[LANGUAGE_NONE][0] = array(
+    'amount' => 0,
+    'currency_code' => "GBP",
+  );
+  $product->uid = 1;
+  commerce_product_save($product);
+}
+
+/**
+ * Update tab text.
+ */
+function rmets_cpd_accreditation_update_7110() {
+  variable_set('rmets_ae4fd512b8a8012fe01aa6f31cd9bec4', 'Please use the “Add another item” button at the bottom of the page to add in all your relevant positions, whether in one organisation or with different employers.\r\n\r\nPlease state the date from which your qualifying work experience should count. Time spent on training courses does not count towards qualifying experience. Time spent as an operational supernumerary (trainee) or under close direct supervision counts as 50% of elapsed time. If you are returning to the full Register from a period as a “dormant” registrant, you need to show 1 full year of “Qualifying experience”.\r\n\r\nPlease note that changes made here will be applied to your main account profile work experience tab');
+}

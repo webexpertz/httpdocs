@@ -1,0 +1,7 @@
+<?php
+/**
+ * @file
+ * Code for the rmets_cpd_records_features feature.
+ */
+
+include_once 'rmets_cpd_records_features.features.inc';

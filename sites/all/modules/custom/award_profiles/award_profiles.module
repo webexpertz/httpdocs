@@ -1,0 +1,747 @@
+<?php
+
+/**
+ * @file
+ * Code for the award_profiles feature.
+ */
+
+use Drupal\rmets_crm\Api\Request\GetAwardsWinnersRequest;
+use Drupal\rmets_crm\Api\Request\GetAllFrmetsContactsRequest;
+use Drupal\rmets_crm\Api\Request\GetAllAccreditatedContactsRequest;
+use Drupal\rmets_crm\Api\Request\InvalidRequestException;
+use Drupal\rmets_crm\Api\ApiServerException;
+use Drupal\rmets_crm\Model\AwardWinner;
+use Drupal\rmets_crm\Model\AccreditatedContact;
+use Drupal\rmets_crm\Model\FrmetsContact;
+
+use Drupal\rmets_membership_user\EntityWrapper\User\UserWrapper;
+use Drupal\rmets_wrapper\EntityWrapper\TaxonomyTerm\AccreditationTypeTermWrapper;
+
+include_once 'award_profiles.features.inc';
+
+function award_profiles_init() {
+}
+
+/**
+ * Implements hook_cron().
+ * Synchronise award winners & accreditations with CRM on cron.
+ */
+function award_profiles_cron() {
+  // Run all at once.
+  $last_run = variable_get('award_profiles_last_sync', 0);
+
+  // Only run in the small hours if past a time once every 24 hours
+  // or any cron run when last_run is 0 (never run before).
+  if ($last_run !== FALSE && time() > ($last_run + 3600) && ($last_run == 0 || date('G') == '1')) {
+    _award_profiles_sync_all();
+  }
+}
+
+/**
+ * Implements hook_menu().
+ */
+function award_profiles_menu() {
+  $items['admin/reports/status/crm_sync_awards'] = array(
+    'title' => 'Synchronise accreditations and awards',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('crm_sync_awards_confirm'),
+    'access arguments' => array('access administration pages'),
+    'type' => MENU_CALLBACK,
+    'file' => 'award_profiles.admin.inc',
+  );
+
+  return $items;
+}
+
+/**
+ * Get a list of award taxonomy terms.
+ *
+ * @return array
+ *   Array of taxonomy terms.
+ */
+function award_profiles_get_awards() {
+  $terms = &drupal_static('__FUNCTION__');
+
+  if (!isset($terms)) {
+    $vocab = taxonomy_vocabulary_machine_name_load('accreditations_awards');
+
+    $query = new EntityFieldQuery();
+    $results = $query->entityCondition('entity_type', 'taxonomy_term')
+      ->propertyCondition('vid', $vocab->vid)
+      ->addMetaData('account', user_load(1))
+      ->execute();
+
+    $terms = array();
+
+    if (isset($results['taxonomy_term'])) {
+      $terms = entity_load('taxonomy_term', array_keys($results['taxonomy_term']));
+
+      // Reset the keys for batch processing.
+      $terms = array_values($terms);
+    }
+  }
+
+  return $terms;
+}
+
+/**
+ * Get the list of award winners from CRM
+ * and create new entries for any missing ones.
+ */
+function _award_profiles_sync_all($batch_mode = FALSE) {
+  if ($batch_mode) {
+    $batch = array(
+      'title' => t('Synchronising awards with CRM'),
+      'operations' => array(
+        array('_award_profiles_batch_sync', array()),
+      ),
+      'init_message' => t('Accreditations and awards synchronisation is starting.'),
+      'progress_message' => t('Processed @current out of @total.'),
+      'error_message' => t('The import has encountered an error.'),
+      'finished' => '_award_profiles_batch_finished',
+    );
+
+    batch_set($batch);
+  }
+  else {
+
+    // Try to allocate enough time to sync all.
+    drupal_set_time_limit(240);
+
+    try {
+      // Run this in a transaction. Any errors at all stop
+      // and roll back as we've seen endless imports occuring.
+      $txn = db_transaction();
+
+      $i = 0;
+      foreach (award_profiles_get_awards() as $award_term) {
+        _award_profiles_sync($award_term);
+      }
+    }
+    catch (Exception $e) {
+      // Undo changes.
+      $txn->rollback();
+      // Stop any more award syncronisation by cron.
+      variable_set('award_profiles_last_sync', FALSE);
+      watchdog_exception('type', $e);
+    }
+
+    // All good.
+    variable_set('award_profiles_last_sync', time());
+  }
+}
+
+/**
+ * Synchronise one award type.
+ */
+function _award_profiles_batch_sync(&$context) {
+
+  // Get all the award terms in an array with incrementing keys.
+  $terms = award_profiles_get_awards();
+
+  if (empty($context['sandbox'])) {
+    // Initiate multistep processing.
+    $context['sandbox']['progress'] = 0;
+    $context['sandbox']['max'] = count($terms);
+  }
+
+  try {
+    // Run this in a transaction. Any errors at all stop
+    // and roll back as we've seen endless imports occuring.
+    $txn = db_transaction();
+
+    // Select the next award to process.
+    $award_term = $terms[$context['sandbox']['progress']];
+
+    // Process this award.
+    //watchdog('award_profiles', 'Sync term: "!name" start', array('!name' => $award_term->name));
+    _award_profiles_sync($award_term);
+    //watchdog('award_profiles', 'Sync term: "!name" end', array('!name' => $award_term->name));
+
+    // Multi step process varaibes.
+    $context['message'] = t('Processed %term', array('%term' => $award_term->name));
+    $context['sandbox']['progress']++;
+
+    if ($context['sandbox']['progress'] < $context['sandbox']['max']) {
+      $context['finished'] = $context['sandbox']['progress'] / $context['sandbox']['max'];
+    }
+    else {
+      // All good.
+      $context['finished'] = 1;
+      variable_set('award_profiles_last_sync', time());
+    }
+
+  }
+  catch (Exception $e) {
+    $txn->rollback();
+    watchdog_exception('type', $e);
+    $context['message'] = $e->getMessage();
+    $context['finished'] = 1;
+  }
+}
+
+/**
+ * Import all winners of a specified award.
+ *
+ * @param taxonomy_term $award_term
+ *   A taoxonomy term from the accreditations_awards vocabulary.
+ *
+ * @throws Exception
+ *  Exceptions are thrown by this function. Higher up functions
+ *  should catch and deal with these.
+ */
+function _award_profiles_sync($award_term) {
+  $award_term_wrapper = entity_metadata_wrapper('taxonomy_term', $award_term);
+  $crm_award_details = array();
+
+  // Get the list of members from CRM with the relevant award/ accreditation.
+  $award_id = '';
+  if (!empty($award_term_wrapper->field_crm_award_field->value())) {
+    $award_id = $award_term_wrapper->field_crm_award_field->value();
+    _award_profiles_get_award_winners($award_id, $crm_award_details);
+    return;
+  }
+  if (!empty($award_term_wrapper->field_crm_accreditation_field->value())) {
+    $award_id = $award_term_wrapper->field_crm_accreditation_field->value();
+    _award_profiles_get_accreditation_winners($award_id, $crm_award_details);
+    if (!empty($crm_award_details)) {
+      // For some reason the xautoload isn't loading these classes here, so manually including them.
+      require_once DRUPAL_ROOT . '/sites/all/modules/custom/rmets_wrapper/src/EntityWrapper/EntityWrapper.php';
+      require_once DRUPAL_ROOT . '/sites/all/modules/custom/rmets_wrapper/src/EntityWrapper/TaxonomyTerm/TaxonomyTermWrapper.php';
+      require_once DRUPAL_ROOT . '/sites/all/modules/custom/rmets_wrapper/src/EntityWrapper/TaxonomyTerm/AccreditationTypeTermWrapper.php';
+      $accreditation_type_wrapper = AccreditationTypeTermWrapper::getByCrmAccreditationId($award_term_wrapper->field_crm_accreditation_field->value());
+      $uids = _award_profiles_add_users_accreditations($crm_award_details, $accreditation_type_wrapper);
+      _award_profiles_remove_users_accreditations($accreditation_type_wrapper, $uids);
+    }
+  }
+  if (!empty($award_term_wrapper->field_crm_fellow->value())) {
+    $award_id = 'fellow';
+    _award_profiles_get_fellow_winners($crm_award_details);
+    return;
+  }
+  if (empty($award_id)) {
+    watchdog('award_profiles', 'No award id found for the taxonomy term : %term_name (%term_id)', array('%term_name' => $award_term_wrapper->label() ,'%term_id' => $award_term_wrapper->getIdentifier()));
+    return;
+  }
+  if (empty($crm_award_details)) {
+    watchdog('award_profiles', 'No award details returned from CRM for the taxonomy term : %term_name (%term_id)', array('%term_name' => $award_term_wrapper->label() ,'%term_id' => $award_term_wrapper->getIdentifier()));
+    return;
+  }
+
+  // Get a list of all membership numbers.
+  $profile_membership_numbers = array_keys($crm_award_details);
+  if (!empty($profile_membership_numbers)) {
+    $profile_membership_numbers = array_combine($profile_membership_numbers, $profile_membership_numbers);
+  }
+
+  // Get a list of award_profile nids keyed by membership number.
+  $award_profile_nids = array();
+
+  // Create profile pages for award winners that do not have them.
+  if (!empty($profile_membership_numbers)) {
+    $results = db_select('field_data_field_membership_number', 'm')
+      ->fields('m', array('field_membership_number_value', 'entity_id'))
+      ->condition('field_membership_number_value', $profile_membership_numbers, 'IN')
+      ->condition('entity_type', 'node')
+      ->condition('bundle', 'award_profile')
+      ->execute();
+
+    // All results returned already have profiles.
+    foreach ($results as $result) {
+      unset($profile_membership_numbers[$result->field_membership_number_value]);
+      $award_profile_nids[$result->field_membership_number_value] = $result->entity_id;
+    }
+
+    if (!empty($profile_membership_numbers)) {
+      foreach ($profile_membership_numbers as $membership_number) {
+        // Create a new profile for each member.
+        $award_node = _award_profile_create_profile($crm_award_details[$membership_number], TRUE);
+        if (!empty($award_node)) {
+          $award_profile_nids[$membership_number] = $award_node->nid;
+        }
+      }
+    }
+  }
+
+  // Get a list of existing award nodes for this award.
+  $award_nodes = array();
+
+  $q = new EntityFieldQuery();
+  $r = $q->entityCondition('entity_type', 'node')
+    ->entityCondition('bundle', 'award')
+    ->fieldCondition('field_award_type', 'tid', $award_term->tid, '=')
+    ->addMetaData('account', user_load(1))
+    ->execute();
+
+  if (isset($r['node'])) {
+    $award_nodes = entity_load('node', array_keys($r['node']));
+  }
+
+  // Update the existing awards.
+  foreach ($award_nodes as $nid => $award_node) {
+    $award_node_wrapper = entity_metadata_wrapper('node', $award_node);
+    $membership_number = $award_node_wrapper->field_membership_number->value();
+    $timestamp = $award_node_wrapper->field_award_date->value();
+    $crm_award_timestamp = (isset($crm_award_details[$membership_number])) ? $crm_award_details[$membership_number]->getAwardDateAsTimestamp() : NULL;
+    if (!array_key_exists($membership_number, $crm_award_details) || $timestamp != $crm_award_timestamp) {
+      // This member has not won this award on this date according to Enterprise.
+      unset($award_nodes[$nid]);
+      // delete
+      node_delete($nid);
+    }
+    else {
+      // Check that the award is still linked to an award profile, if not than
+      // get the award profile for this member and set the correct link.
+      $member_profile = $award_node_wrapper->field_member_profile->value();
+
+      if ((!isset($member_profile) || is_null($member_profile)) && isset($award_profile_nids[$membership_number])) {
+        $award_profile = node_load($award_profile_nids[$membership_number]);
+        $award_node_wrapper->field_member_profile->set($award_profile);
+        $award_node_wrapper->save();
+      }
+
+      if (isset($award_profile_nids[$membership_number])) {
+        // Update the profile info
+        $award_profile = node_load($award_profile_nids[$membership_number]);
+        $award_profile->title = "{$crm_award_details[$membership_number]->getForename()} {$crm_award_details[$membership_number]->getSurname()}";
+        $award_profile_wrapper = entity_metadata_wrapper('node', $award_profile);
+        $award_profile_wrapper->field_forenames->set($crm_award_details[$membership_number]->getForename());
+        $award_profile_wrapper->field_surname->set($crm_award_details[$membership_number]->getSurname());
+        $award_profile_wrapper->field_membership_number->set($crm_award_details[$membership_number]->getMembershipNumber());
+        $award_profile_wrapper->field_prefix->set($crm_award_details[$membership_number]->getTitle());
+        $award_profile_wrapper->field_suffix->set($crm_award_details[$membership_number]->getSuffix());
+        $award_profile_wrapper->save();
+      }
+
+
+      // This award is still valid, dont try and make a new one later.
+      unset($crm_award_details[$membership_number]);
+    }
+  }
+
+  // Create new awards.
+  foreach ($crm_award_details as $membership_number => $award) {
+    try {
+      $node = new stdClass();
+      $node->type = 'award';
+      $node->title = $membership_number . ': ' . $award_term->name;
+      $node->uid = 1;
+      $node->log = t('Created award from CRM data');
+      $node->language = LANGUAGE_NONE;
+
+      // Award nodes are just data repositories and are always unpublished.
+      $node->status = FALSE;
+
+      // Create the new accreditation and awards profile node.
+      node_save($node);
+
+      $node_wrapper = entity_metadata_wrapper('node', $node);
+
+      // Add the date.
+      $award_date = $award->getAwardDateAsTimestamp();
+      if (!empty($award_date)) {
+        $node_wrapper->field_award_date->set($award_date);
+      }
+
+      // Add a reference to the profile page.
+      $node_wrapper->field_member_profile->set($award_profile_nids[$membership_number]);
+
+      // Add a term reference to the award type.
+      $node_wrapper->field_award_type->set($award_term->tid);
+
+      // Add a membership number.
+      $node_wrapper->field_membership_number->set($membership_number);
+
+      node_save($node);
+    } catch (EntityMetadataWrapperException $e) {
+      watchdog('award_profiles', 'Failed to create an award: @membership_number for award: @award_name - profile: @award_profile_nids. Error returned: @exception', array('@membership_number' => $membership_number, '@award_name' => $award_term->name, '@award_profile_nids' => $award_profile_nids[$membership_number], '@exception' => $e->getMessage()));
+    } catch (PDOException $pdoe) {
+      drupal_set_message('Although the import has completed, there were some problems importing some awards. See the error log for further details.', 'error');
+      watchdog('award_profiles', 'Fatal exception trying to create an award for membership number: @membership_number for award: @award_name. Error returned: @exception', array('@membership_number' => $membership_number, '@award_name' => $award_term->name, '@exception' => $pdoe->getMessage()), WATCHDOG_CRITICAL);
+    }
+  }
+}
+
+/**
+ * Remove the given accreditation from all users unless excluded.
+ *
+ * @param $accreditation_type_wrapper AccreditationTypeTermWrapper
+ * @param $exclusion_uids - int[] excluded uids
+ */
+function _award_profiles_remove_users_accreditations($accreditation_type_wrapper, $exclusion_uids) {
+  $tid = $accreditation_type_wrapper->getIdentifier();
+  $remove_id_from_users = db_query(
+    "SELECT entity_id FROM {field_data_field_accreditation_types}
+     WHERE field_accreditation_types_tid=:tid
+     AND entity_type = 'user'
+     AND entity_id NOT IN (:exclusions)
+  ", [':tid' => $tid, ':exclusions' => $exclusion_uids]);
+  foreach ($remove_id_from_users AS $id => $remove_id_from_user) {
+    $user_wrapper = new UserWrapper($remove_id_from_user->entity_id);
+    $current_accreditations = $user_wrapper->getAccreditationTypes();
+    $current_accreditations = array_filter($current_accreditations, function($k) use ($tid) {
+      return $k->tid != $tid;
+    });
+    $user_wrapper->setAccreditationTypes($current_accreditations);
+    $user_wrapper->save(FALSE);
+  }
+}
+
+
+/**
+ * @param $details AccreditatedContact[]
+ * @param $accreditation_type_wrapper AccreditationTypeTermWrapper
+ * @return int[]
+ */
+function _award_profiles_add_users_accreditations($details, $accreditation_type_wrapper) {
+    $uids = [];
+    foreach ($details AS $membership_number => $member) {
+      $email = $member->getEmail();
+      $user_wrapper = UserWrapper::getObjectByCrmId($member->getContactId());
+      if (!$user_wrapper) {
+        // Try by email
+        if (!empty($email)) {
+          $user_wrapper = UserWrapper::getObjectByEmail($member->getEmail());
+        }
+        if (!$user_wrapper) {
+          continue;
+        }
+        $user_wrapper->updateFromCrm();
+      }
+      $current_accreditations = $user_wrapper->getAccreditationTypes();
+      if (!_award_profile_has_accreditation($current_accreditations, $accreditation_type_wrapper)) {
+        $current_accreditations[] = $accreditation_type_wrapper->getIdentifier();
+      }
+      $user_wrapper->setAccreditationTypes($current_accreditations);
+      $user_wrapper->save(FALSE);
+      $uids[$user_wrapper->getIdentifier()] = $user_wrapper->getIdentifier();
+    }
+    return $uids;
+}
+
+/**
+ * Helper function to check whether the user already has the given accreditation.
+ *
+ * @param $current_accreditations
+ * @param $accreditation_type_wrapper
+ * @return mixed
+ */
+function _award_profile_has_accreditation($current_accreditations, $accreditation_type_wrapper) {
+  return current(array_filter($current_accreditations, function ($element) use ($accreditation_type_wrapper) {
+    return $element->tid == $accreditation_type_wrapper->getIdentifier();
+  }));
+}
+
+/**
+ * Helper function to get al the award winners for a certain award.
+ *
+ * @param string $award_id
+ *   The award id to search for
+ * @param array $details
+ * @param int $page
+ */
+function _award_profiles_get_award_winners($award_id, &$details, $page = 1) {
+  try {
+    $request = new GetAwardsWinnersRequest();
+    $request->setGuid(variable_get('rmets_crm_api_guid', ''));
+    $request->setAwardId($award_id);
+    $request->setPage($page);
+    $request->setRecordCount(10);
+
+    /** @var \Drupal\rmets_crm\Api\CrmService $api */
+    $api = rmets_crm_get_api();
+    $response = $api->getAwardsWinners($request);
+
+    foreach ($response->getIterator() as $winner) {
+      /** @var $winner AwardWinner */
+      $details[$winner->getMembershipNumber()] = $winner;
+    }
+
+    if ($response->getMoreRecords()) {
+      $page++;
+      _award_profiles_get_award_winners($award_id, $details, $page);
+    }
+  }
+  catch (InvalidRequestException $e) {
+    watchdog('award_profiles', 'Failed to get fellow winner with data: !data with exception !err', array('!data' => $details, '!err' => $e->getMessage()));
+    //print drush_set_error('FATAL', $e->getMessage());
+  }
+  catch (ApiServerException $apie) {
+    //print drush_set_error('FATAL', 'Unable to communicate with the CRM API: ' . $apie->getMessage());
+  }
+}
+
+/**
+ * Helper function to get al the accreditation winners for a certain award.
+ *
+ * @param string $accreditation_id
+ *   The accreditation id to search for
+ * @param array $details
+ * @param int $page
+ */
+function _award_profiles_get_accreditation_winners($accreditation_id, &$details, $page = 1) {
+  try {
+    $request = new GetAllAccreditatedContactsRequest();
+    $request->setGuid(variable_get('rmets_crm_api_guid', ''));
+    $request->setAccreditationId($accreditation_id);
+    $request->setPage($page);
+    $request->setRecordCount(10);
+
+    /** @var \Drupal\rmets_crm\Api\CrmService $api */
+    $api = rmets_crm_get_api();
+    $response = $api->getAllAccreditatedContacts($request);
+
+    foreach ($response->getIterator() as $winner) {
+      /** @var $winner AccreditatedContact */
+      // Hack to filter data correctly.
+      if (empty($winner->getAccreditationID())) {
+        continue;
+      }
+      $details[$winner->getMembershipNumber()] = $winner;
+    }
+
+    if ($response->getMoreRecords()) {
+      $page++;
+      _award_profiles_get_accreditation_winners($accreditation_id, $details, $page);
+    }
+  }
+  catch (InvalidRequestException $e) {
+    watchdog('award_profiles', 'Failed to get award winner with id: !id and data: !data with exception !err', array('!id' => $award_id, '!data' => $details, '!err' => $e->getMessage()));
+    //print drush_set_error('FATAL', $e->getMessage());
+  }
+  catch (ApiServerException $apie) {
+    //print drush_set_error('FATAL', 'Unable to communicate with the CRM API: ' . $apie->getMessage());
+  }
+}
+
+/**
+ * Helper function to get all the Fellow winners.
+ *
+ * @param array $details
+ * @param int $page
+ */
+function _award_profiles_get_fellow_winners(&$details, $page = 1) {
+  try {
+    $request = new GetAllFrmetsContactsRequest();
+    $request->setGuid(variable_get('rmets_crm_api_guid', ''));
+    $request->setPage($page);
+    $request->setRecordCount(10);
+
+    /** @var \Drupal\rmets_crm\Api\CrmService $api */
+    $api = rmets_crm_get_api();
+    $response = $api->getAllFRMetSContacts($request);
+
+    foreach ($response->getIterator() as $winner) {
+      /** @var $winner FrmetsContact */
+      // Hack to filter data correctly.
+      if (empty($winner->getElectionDate())) {
+        continue;
+      }
+      $details[$winner->getMembershipNumber()] = $winner;
+    }
+
+    if ($response->getMoreRecords()) {
+      $page++;
+      _award_profiles_get_fellow_winners($details, $page);
+    }
+  }
+  catch (InvalidRequestException $e) {
+    watchdog('award_profiles', 'Failed to get accreditation winner with id: !id and data: !data with exception !err', array('!id' => $accreditation_id, '!data' => $details, '!err' => $e->getMessage()));
+    //print drush_set_error('FATAL', $e->getMessage());
+  }
+  catch (ApiServerException $apie) {
+    //print drush_set_error('FATAL', 'Unable to communicate with the CRM API: ' . $apie->getMessage());
+  }
+}
+
+/**
+ * Helper function, update a memebers profile with details
+ * from Enterprise.
+ *
+ * @param AwardWinner | AccreditatedContact $award
+ *   The award winner object from CRM.
+ * @param boolean $include_sensitive_details
+ *   Default FALSE. Set to true to also update the address,
+ *   email and telephone number fields. Care must be taken
+ *   when setting this field as it means user data will be
+ *   exposed to the web. Some members want this but really,
+ *   only set this on initial creation when the node is
+ *   not published so an admin makes the final decision
+ *   to allow the data to be exposed to the web.
+ *
+ * @return object|FALSE
+ *   The award_profile node created or FALSE if it
+ *   could not be created.
+ */
+function _award_profile_create_profile($award, $include_sensitive_details = FALSE) {
+  if (is_a($award, 'Drupal\rmets_crm\Model\AwardWinner')
+    || is_a($award, 'Drupal\rmets_crm\Model\AccreditatedContact')
+    || is_a($award, 'Drupal\rmets_crm\Model\FrmetsContact')
+    ) {
+    $node = new stdClass();
+    $node->type = 'award_profile';
+    $node->title = "{$award->getForename()} {$award->getSurname()}";
+    $node->uid = 1;
+    $node->log = t('Created award from CRM data');
+    $node->language = LANGUAGE_NONE;
+
+    // The award profile starts life as unpublished content.
+    $node->status = FALSE;
+
+    // Create the new accreditation and awards profile node.
+    node_save($node);
+
+    $node_wrapper = entity_metadata_wrapper('node', $node);
+
+    $node_wrapper->field_forenames->set($award->getForename());
+    $node_wrapper->field_surname->set($award->getSurname());
+    $node_wrapper->field_membership_number->set($award->getMembershipNumber());
+    $node_wrapper->field_prefix->set($award->getTitle());
+    $node_wrapper->field_suffix->set($award->getSuffix());
+
+    if (is_a($award, 'Drupal\rmets_crm\Model\AwardWinner')) {
+      if (!empty($award->getCitation())) {
+        $node_wrapper->body->set($award->getCitation());
+      }
+    }
+
+    // Only update these fields when the node is unpublished.
+    // Published nodes have been set and must not be changed in
+    // case user details escape onto the web that do not want
+    // their details published.
+    // Note that these fields can be publicly accessible and
+    // should be overridden on the site when the node is published.
+    // Update sensitive user data for this person.
+    if ($include_sensitive_details) {
+
+      if (!empty($award->getEMail())) {
+        $node_wrapper->field_public_email->set($award->getEMail());
+      }
+
+      $account = UserWrapper::createNewUserAccount($award->getEMail());
+      $member = new UserWrapper($account);
+      $member->updateFromCrm();
+
+      if ($member->isValidCrmContact()) {
+        $address_string = "{$member->getAddress1()},\n{$member->getAddress2()},\n{$member->getAddress3()},\n{$member->getCity()},\n{$member->getStateProvince()}\n{$member->getPostCode()}\n{$member->getCountry()}";
+        $node_wrapper->field_accreditation_address->set(array(
+          'value' => $address_string,
+          'filter_format' => 'full_html'
+        ));
+        if ($member->getHomePhone()) {
+          $node_wrapper->field_public_telephone->set($member->getHomePhone());
+        }
+      }
+    }
+
+    node_save($node);
+
+    return $node;
+  }
+
+  return FALSE;
+}
+
+/**
+ * Post-processing for batch processing.
+ */
+function _award_profiles_batch_finished($success, $results, $operations) {
+  if ($success) {
+    drupal_set_message(t('The awards have been synchronised.'));
+  }
+  else {
+    drupal_set_message(t('There was a problem syncing the award profiles.'), 'error');
+  }
+  cache_clear_all();
+}
+
+/**
+ * Implements hook_menu_block_tree_alter().
+ * When the menu block is created, rebuild the menu depending on
+ * the current contexts.
+ */
+function award_profiles_menu_block_tree_alter(&$tree, $config) {
+  if (context_isset('context', 'award_profiles_people')) {
+    // We want the left hand menu to appear on people profile pages.
+    // It changes depending on context.
+    $q = $_GET['q'];
+    menu_set_active_item(drupal_get_normal_path('about-us/people'));
+    $tree = menu_tree_page_data('main-menu');
+    $_GET['q'] = $q;
+  }
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function award_profiles_form_taxonomy_form_term_alter(&$form, &$form_state, $form_id) {
+  if ($form['#vocabulary']->machine_name == 'accreditations_awards') {
+    $form['#validate'][] = 'award_profiles_term_validate';
+  }
+}
+
+/**
+ * Validate function for the taxonomy term.
+ */
+function award_profiles_term_validate($form, &$form_state) {
+  $is_fellow = $form_state['values']['field_crm_fellow'][LANGUAGE_NONE][0]['value'];
+  $crm_award = $form_state['values']['field_crm_award_field'][LANGUAGE_NONE][0]['value'];
+  $crm_accreditation = $form_state['values']['field_crm_accreditation_field'][LANGUAGE_NONE][0]['value'];
+
+  if (!$is_fellow && empty($crm_award) && empty($crm_accreditation)) {
+    form_set_error('field_crm_award_field', 'You must set a value for either the award or the accreditation field or set this as a Fellow.');
+    form_set_error('field_crm_accreditation_field', '');
+  }
+  if (!$is_fellow && !empty($crm_award) && !empty($crm_accreditation)) {
+    form_set_error('field_crm_award_field', 'You must choose either an award or an accreditation field value not both.');
+    form_set_error('field_crm_accreditation_field', '');
+  }
+  if ($is_fellow && (!empty($crm_award) || !empty($crm_accreditation))) {
+    form_set_error('field_crm_fellow', 'If this is for a Fellow, this can not also be for an award or accreditation.');
+    form_set_error('field_crm_award_field', '');
+    form_set_error('field_crm_accreditation_field', '');
+  }
+}
+
+/**
+ * Implements hook_node_view().
+ */
+function award_profiles_node_view($node, $view_mode, $langcode) {
+  if ($node->type != 'award_profile') {
+    return;
+  }
+
+  $node_wrapper = entity_metadata_wrapper('node', $node);
+  $http_query = drupal_get_query_parameters();
+  $award_tid = (isset($http_query['award_id'])) ? $http_query['award_id'] : NULL;
+
+  if (!empty($award_tid)) {
+    $q = new EntityFieldQuery();
+    $r = $q->entityCondition('entity_type', 'node')
+      ->entityCondition('bundle', 'award')
+      ->fieldCondition('field_membership_number', 'value', $node_wrapper->field_membership_number->value(), '=')
+      ->fieldCondition('field_award_type', 'tid', $award_tid, '=')
+      ->addMetaData('account', user_load(1))
+      ->execute();
+
+    if (isset($r['node'])) {
+      // Add the description from the award to the info for the profile.
+      $award_nodes = entity_load('node', array_keys($r['node']));
+      $award_node = array_values($award_nodes);
+      $award_node_wrapper = entity_metadata_wrapper('node', $award_node[0]);
+      $additional_info = $node_wrapper->field_additional_information->value();
+      $award_body = $award_node_wrapper->body->value();
+      $additional_info2 = $award_body['value'] . $additional_info['value'];
+      $node->content['field_additional_information'][0]['#markup'] = $additional_info2;
+    }
+    unset($node->content['field_public_email']);
+    unset($node->content['field_public_telephone']);
+    unset($node->content['field_accreditation_address']);
+    unset($node->content['field_countries']);
+    unset($node->content['field_current_employment']);
+    unset($node->content['field_expertise']);
+    unset($node->content['field_employment_history']);
+    unset($node->content['award_winners_award_list']);
+
+  }
+}

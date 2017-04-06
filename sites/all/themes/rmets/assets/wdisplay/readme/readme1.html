@@ -1,0 +1,55 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+	<head>
+		<title>Weather Display Live</title>
+		<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+	    <link href="readme.css" rel="stylesheet" type="text/css" />
+		</head>
+	<body id="tab2">
+		<h1>Weather Display Live - Getting Started
+		</h1>
+		<ul id="tabnav">
+			<li class="tab1"><a href="readme.html">Overview</a></li>
+			<li class="tab2"><a href="readme1.html">Installation</a></li>
+			<li class="tab3"><a href="readme2.html">Upgrading</a></li>
+			<li class="tab4"><a href="readme3.html">Configuring</a></li>
+			<li class="tab5"><a href="readme4.html">Purchasing</a></li>
+			<li class="tab6"><a href="readme5.html">Troubleshooting</a></li>
+			<li class="tab7"><a href="readme6.html">Releases</a></li>	
+		</ul>
+
+		<h3>Installation</h3>
+		<p>Installation is straightforward with only one file needing to have a change
+			made to it to get Weather Display Live working in evaluation mode. Step by step
+			instructions are listed below.</p>
+		<p>To install Weather Display Live on your web server -
+	    </p>
+		<ol>
+		  <li>
+			  Open the file index.html from the 'uploads' folder (which can be found in the folder that you installed Weather Display Live on your computer) into in an html editor, Notepad, or a similar text editor.<br />
+		      <br />
+	        Locate the line which says <em>&quot;Enter your details here!!</em>&quot;<br>
+			  <br />
+			  Change the  line beneath it which says - <br />
+			  <br>
+			  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;   var pathToWdlconfig = &quot;http://www.yourwebsite.com/wdlconfig.xml&quot;;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+so that &quot;<em>http://www.yourwebsite.com/wdlconfig.xml</em>&quot; is the path to your wdlconfig.xml file on your website.
+		<br />
+		<br />
+		  <li>		    Copy the contents of the 'uploads' folder into the <strong>same</strong> folder on the web server that
+		    the clientraw.txt and clientrawextra.txt files get FTP'd into by Weather Display. If you haven't configured Weather Display to do this then go to the FAQ section on the forum for the <a href="http://www.weather-watch.com/smf/index.php/topic,9220.0.html" target="_blank">instructions</a>. <br>
+	            <strong><br>
+            </strong>
+	      <li>
+				That's it!			</li>
+		</ol>
+		<p>Open up a web browser and navigate to the index.html file. You should see your
+			live weather data with an Evaluation Notice displayed on top of it.
+		Note you can give the index.html file any name you wish. </p>
+		<p><a href="#top" class="style5"></a>		<a href="readme.2.html">Upgrading &gt;&gt;</a></p>
+		<p>&nbsp;</p>
+		<p>&nbsp;</p>
+		<p align="center" class="small">© Julian Best 2008</p>
+	</body>
+</html>

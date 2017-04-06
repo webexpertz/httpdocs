@@ -1,0 +1,778 @@
+<?php
+
+/**
+ * @file
+ * Module which supports the event and abstract types.
+ */
+
+/**
+ * Implements hook_theme().
+ */
+function event_map_theme() {
+  return array(
+    'event_map_management' => array(
+      'variables' => array('node' => NULL),
+    ),
+  );
+}
+
+/**
+ * Implements hook_node_view().
+ */
+function event_map_node_view($node, $view_mode, $langcode) {
+  if ($node->type == 'event' && $view_mode == 'full') {
+    $breadcrumb = drupal_get_breadcrumb();
+    $breadcrumb[] = l('Events & Meetings', 'events');
+    $breadcrumb[] = $node->title;
+    drupal_set_breadcrumb($breadcrumb);
+  }
+  elseif ($node->type == 'event_session' && $view_mode == 'full') {
+    $breadcrumb = drupal_get_breadcrumb();
+    $breadcrumb[] = l('Events & Meetings', 'events');
+    $event = _event_map_get_parent_event($node);
+    $breadcrumb[] = l($event->title, 'node/' . $event->nid);
+    $breadcrumb[] = $node->title;
+    drupal_set_breadcrumb($breadcrumb);
+    drupal_set_title($event->title);
+  }
+  elseif ($node->type == 'event_subsession' && $view_mode == 'full') {
+    $breadcrumb = drupal_get_breadcrumb();
+    $breadcrumb[] = l('Events & Meetings', 'events');
+    $event_session = entity_metadata_wrapper('node', $node)->field_event_session->value();
+    $event = _event_map_get_parent_event($node);
+    $breadcrumb[] = l($event->title, 'node/' . $event->nid);
+    $breadcrumb[] = l($event_session->title, 'node/' . $event_session->nid);
+    $breadcrumb[] = $node->title;
+    drupal_set_breadcrumb($breadcrumb);
+    drupal_set_title($event->title);
+  }
+  elseif ($node->type == 'event_abstract' && $view_mode == 'full') {
+    $breadcrumb = drupal_get_breadcrumb();
+    $breadcrumb[] = l('Events & Meetings', 'events');
+    $event = _event_map_get_parent_event($node);
+    $breadcrumb[] = l($event->title, 'node/' . $event->nid);
+    if (!empty($node->field_event_sub_session)) {
+      $event_subsession = entity_metadata_wrapper('node', $node)->field_event_sub_session->value();
+      $event_session = entity_metadata_wrapper('node', $event_subsession)->field_event_session->value();
+      $breadcrumb[] = l($event_session->title, 'node/' . $event_session->nid);
+    }
+    $breadcrumb[] = $node->title;
+    drupal_set_breadcrumb($breadcrumb);
+    drupal_set_title($event->title);
+  }
+}
+
+/**
+ * Implements hook_field_formatter_info().
+ */
+function event_map_field_formatter_info() {
+  return array(
+    'event_map_boolean_abstract_submission' => array(
+      'label' => t('Event abstract submission form'),
+      'field types' => array('list_boolean'),
+    ),
+    'event_map_datestamp_hidden_if_midnight' => array(
+      'label' => t('Datetime - hidden if midnight'),
+      'field types' => array('datestamp'),
+      'settings' => array(
+        'format_type' => 'long',
+        'multiple_number' => '',
+        'multiple_from' => '',
+        'multiple_to' => '',
+        'fromto' => 'both',
+      ),
+    ),
+    'event_map_event_type' => array(
+      'label' => t('Event map - Event type taxonomy reference'),
+      'field types' => array('taxonomy_term_reference'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_field_formatter_settings_form().
+ */
+function event_map_field_formatter_settings_form($field, $instance, $view_mode, $from, &$form_state) {
+  $display = $instance['display'][$view_mode];
+  $formatter = $display['type'];
+  if ($formatter == 'event_map_datestamp_hidden_if_midnight') {
+    module_load_include('inc', 'date', 'date_admin');
+    $form = date_default_formatter_settings_form($field, $instance, $view_mode, $form, $form_state);
+    $context = array(
+      'field' => $field,
+      'instance' => $instance,
+      'view_mode' => $view_mode,
+    );
+    drupal_alter('date_field_formatter_settings_form', $form, $form_state, $context);
+    return $form;
+  }
+}
+
+/**
+ * Implements hook_field_formatter_view().
+ */
+function event_map_field_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display) {
+  $element = array();
+
+  if ($display['type'] == 'event_map_boolean_abstract_submission' && !empty($items[0]['value'])) {
+    if (user_is_logged_in()) {
+
+      $my_abstracts = views_embed_view('event_abstracts_event', 'my_abstracts_page', $entity->nid);
+
+      $element[0] = array(
+        '#markup' => l('Submit an abstract', 'node/add/event-abstract', array('attributes' => array('class' => 'button-link'), 'query' => drupal_get_destination() + array('field_event' => $entity->nid))) . $my_abstracts,
+      );
+    }
+    else {
+      $element[0] = array(
+        '#markup' => '<p>' . t('Logged in users can submit abstracts for this event.') . ' ' . l('Login here', 'user/login', array('query' => drupal_get_destination())) . '</p>',
+      );
+    }
+  }
+  elseif ($display['type'] == 'event_map_event_type') {
+    $types = array();
+      foreach ($items as $item) {
+        $type = taxonomy_term_load($item['tid']);
+        if (!empty($type)) {
+          $parents = taxonomy_get_parents($type->tid);
+          foreach ($parents as $term) {
+            $ref = $term->name;
+            if (!empty($term->field_about_page)) {
+              $ref = l($term->name, entity_metadata_wrapper('taxonomy_term', $term)->field_about_page->url->raw());
+            }
+            $types[] = $ref;
+          }
+          $ref = $type->name;
+          if (!empty($type->field_about_page)) {
+            $ref = l($type->name, entity_metadata_wrapper('taxonomy_term', $type)->field_about_page->url->raw());
+          }
+          $types[] = $ref;
+        }
+      }
+
+    $attributes = array();
+    $attributes['class'] = (count($types) > 1 ? array('many') : array('single'));
+
+    $element[0] = array(
+      '#markup' => (!empty($types) ? theme('item_list', array('items' => $types, 'attributes' => $attributes)) : FALSE),
+    );
+  }
+  elseif ($display['type'] == 'event_map_datestamp_hidden_if_midnight') {
+    $variables = array(
+      'entity' => $entity,
+      'entity_type' => $entity_type,
+      'field' => $field,
+      'instance' => $instance,
+      'langcode' => $langcode,
+      'items' => $items,
+      'display' => $display,
+      'dates' => array(),
+      'attributes' => array(),
+    );
+    foreach ($items as $delta => $item) {
+      $time = date('H:i', $item['value']);
+      $output = '';
+
+      if ($time != '00:00') {
+        $variables['delta'] = $delta;
+        $variables['item'] = $item;
+        $variables['dates'] = date_formatter_process($display['type'], $entity_type, $entity, $field, $instance, $langcode, $item, $display);
+        $variables['attributes'] = array();
+        $output = theme('date_display_combination', $variables);
+      }
+      if (!empty($output)) {
+        $element[$delta] = array('#markup' => $output);
+      }
+    }
+  }
+
+  return $element;
+}
+
+/**
+ * Implements hook_permission().
+ */
+function event_map_permission() {
+  return array(
+    'administer rmets events' => array(
+      'title' => t('Administer RMetS Events'),
+      'description' => t('Give to event administrator to allow them to edit the hidden fields on events'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_field_access().
+ * Hide some abstract fields from non-admins.
+ */
+function event_map_field_access($op, $field, $entity_type, $entity, $account) {
+  if ($entity_type == 'node' && $op == 'edit' && in_array($field['field_name'], array('field_abstract_time_and_date', 'field_presentation_number', 'field_event_sub_session', 'field_presentation_number_2'))) {
+    return user_access('administer rmets events', $account);
+  }
+}
+
+/**
+ * Implements hook_block_info().
+ */
+function event_map_block_info() {
+  $blocks = array();
+
+  $blocks['event_management'] = array(
+    'info' => t('Event management'),
+    'cache' => DRUPAL_NO_CACHE,
+    'properties' => array(
+      'administrative' => TRUE,
+    ),
+    'status' => 1,
+    'region' => 'sidebar_first',
+  );
+
+  return $blocks;
+}
+
+/**
+ * Implements hook_block_view().
+ */
+function event_map_block_view($delta = '') {
+  $block = array();
+
+  switch ($delta) {
+  case 'event_management' :
+    if (user_access('administer rmets events')) {
+      $node = FALSE;
+      $args = arg();
+      if (isset($args[0]) && $args[0] == 'node' && isset($args[1]) && is_numeric($args[1])) {
+        $node = node_load($args[1]);
+      }
+      if ($node) {
+        $block['subject'] = t('Event management');
+        $block['content'] = array(
+          '#theme' => 'event_map_management',
+          '#node' => $node,
+        );
+      }
+    }
+    break;
+  }
+
+  return $block;
+}
+
+/**
+ * Work out the current event from the URL.
+ * This might be either the current node/nid or if their is
+ * a field_event in $_GET set then it will use that.
+ *
+ * @return boolean|object
+ *   An event node or FALSE
+ */
+function _event_map_get_event_from_url() {
+  $args = arg();
+  if (isset($_GET['field_event']) && is_numeric($_GET['field_event'])) {
+    $event = node_load($_GET['field_event']);
+    if ($event->type == 'event') {
+      return $event;
+    }
+  }
+  elseif (isset($args[0]) && $args[0] == 'node' && isset($args[1]) && is_numeric($args[1])) {
+    $node = node_load($args[1]);
+    $event = _event_map_get_parent_event($node);
+    if (!empty($event) && _event_map_is_event_node_type($event)) {
+      return $event;
+    }
+  }
+  return FALSE;
+}
+
+/**
+ * Helper function. Find out if a node is part of an event.
+ *
+ * @param object $node
+ *   The fully loaded node to check.
+ *
+ * @return boolean
+ *   TRUE if the node is part of an event.
+ */
+function _event_map_is_event_node_type($node) {
+  return in_array($node->type, array('event', 'event_abstract', 'event_session', 'event_subsession'));
+}
+
+/**
+ * Theme function.
+ * The management block display.
+ */
+function theme_event_map_management($variables) {
+  $node = $variables['node'];
+  $event = _event_map_get_parent_event($node);
+  if (empty($event)) {
+    return t('This is not an event page');
+  }
+  $event_wrapper = entity_metadata_wrapper('node', $event);
+
+  $items = array();
+  $items[] = l($event->title, 'node/' . $event->nid) . ' [' . l('edit', 'node/' . $event->nid . '/edit', array('query' => drupal_get_destination())) . ']';
+  $items[] = ($event_wrapper->field_allow_abstract_submissions->value() == '1' ? t('Users can submit abstract submissions') : t('Users cannot submit abstract submissions'));
+
+  // Removed some stuff not relevant for smartimpact.
+  //$items[] = l(t('Create a session'), 'node/add/event-session', array('query' => array('field_event' => $event->nid)));
+
+  //if ($node->type == 'event_session') {
+  //  $items[] = l(t('Create subsession'), 'node/add/event-subsession', array('query' => drupal_get_destination() + array('field_event_session' => $node->nid)));
+  //  $items[] = l(t('Abstracts for @session', array('@session' => $node->title)), 'session-abstracts/' . $node->nid);
+  //}
+
+
+  $items[] = l(t('All abstracts'), 'node/' . $event->nid . '/abstracts');
+  $items[] = l(t('Add an abstract'), 'node/add/event-abstract', array('query' => array('field_event' => $event->nid)));
+  $items[] = l(t('Instructions'), 'help/event_map/event_map_event_config');
+
+  return theme('item_list', array('items' => $items));
+}
+
+/**
+ * Helper function.
+ * Given a node get the event node that is it's parent.
+ */
+function _event_map_get_parent_event($node) {
+  $event = NULL;
+
+  if (!empty($node) && is_object($node) && !empty($node->type)) {
+
+    switch ($node->type) {
+      case 'event':
+        $event = $node;
+        break;
+
+      case 'event_subsession' :
+        $node = entity_metadata_wrapper('node', $node)->field_event_session->value();
+
+      case 'event_session' :
+      case 'event_abstract' :
+        $event = !empty($node->field_event) ? entity_metadata_wrapper('node', $node)->field_event->value() : _event_map_get_event_from_url();
+        break;
+    }
+  }
+
+  return $event;
+}
+
+/**
+ * Implements hook_ds_fields_info().
+ * Field on session which prints all sub session details.
+ */
+function event_map_ds_fields_info($entity_type) {
+
+  $fields = array();
+
+  $fields['event_map_session_subsessions'] = array(
+    'title' => t('Subsession details'),
+    'field_type' => DS_FIELD_TYPE_FUNCTION,
+    'ui_limit' => array('event_session|*'),
+    'function' => 'theme_ds_event_map_session_subsessions',
+  );
+
+  $fields['event_map_programme'] = array(
+    'title' => t('Event programme listing'),
+    'field_type' => DS_FIELD_TYPE_FUNCTION,
+    'ui_limit' => array('event|*'),
+    'function' => 'theme_ds_event_map_programme',
+  );
+
+  $fields['event_map_map'] = array(
+    'title' => t('Event location map'),
+    'field_type' => DS_FIELD_TYPE_FUNCTION,
+    'ui_limit' => array('event|*'),
+    'function' => 'theme_ds_event_map_map',
+  );
+
+  $fields['event_map_abstract_session_title'] = array(
+    'title' => t('Event Session title'),
+    'field_type' => DS_FIELD_TYPE_FUNCTION,
+    'ui_limit' => array('event_abstract|*'),
+    'function' => 'theme_ds_event_map_abstract_session_title',
+  );
+
+  $fields['event_map_nid'] = array(
+    'title' => t('nid'),
+    'field_type' => DS_FIELD_TYPE_FUNCTION,
+    'ui_limit' => array('*|*'),
+    'function' => 'theme_ds_event_map_nid',
+  );
+
+  return array('node' => $fields);
+}
+
+/**
+ * DS Theme function.
+ * The node nid
+ */
+function theme_ds_event_map_nid($vars) {
+  return $vars['entity']->nid;
+}
+
+/**
+ * DS Theme function.
+ * A list of subsessions for a session.
+ */
+function theme_ds_event_map_session_subsessions($vars) {
+  $session = $vars['entity'];
+  $output = views_embed_view('event_abstracts_for_a_session', 'default', $session->nid);
+
+  if (user_access('administer rmets events')) {
+
+    $results = db_query("SELECT sub.nid
+        FROM node sub
+        INNER JOIN field_data_field_event_session sess_ref ON sub.type = 'event_subsession' AND sub.nid = sess_ref.entity_id
+        LEFT JOIN field_data_field_event_sub_session ref ON sub.type = 'event_subsession' AND sub.nid = ref.field_event_sub_session_target_id
+        WHERE ref.field_event_sub_session_target_id IS NULL AND sess_ref.field_event_session_target_id = :session", array(':session' => $session->nid));
+
+    $empty_sub_sessions = array();
+    foreach ($results as $sub_session) {
+      $empty_sub_sessions[] = $sub_session->nid;
+    }
+
+    if (!empty($empty_sub_sessions)) {
+      $items = array();
+      foreach (node_load_multiple($empty_sub_sessions) as $sub_session) {
+        $location = entity_metadata_wrapper('node', $sub_session)->field_event_subsession_location->value();
+        $items[] = "{$sub_session->title} - {$location} [" . l('edit', 'node/' . $sub_session->nid . '/edit', array('query' => drupal_get_destination())) . ']';
+      }
+      $output .= theme('item_list', array('items' => $items, 'title' => t('Empty sub sessions')));
+    }
+  }
+
+  return $output;
+}
+
+/**
+ * DS Theme function.
+ * Add the programme for an event.
+ */
+function theme_ds_event_map_programme($vars) {
+  $output = '';
+  $event = $vars['entity'];
+  $wrapper = entity_metadata_wrapper('node', $event);
+
+  if ($wrapper->field_event_display_programme->value()) {
+    if (_event_map_event_has_sessions($event)) {
+      // Print out the session programme.
+      $output = views_embed_view('event_programme', 'default', $event->nid);
+    }
+    else {
+      // Print out the abstract listing programme.
+      $output = views_embed_view('event_abstracts_event', 'default', $event->nid);
+    }
+  }
+
+  return $output;
+}
+
+/**
+ * DS Theme function.
+ * Add the Session title to the abstract node.
+ */
+function theme_ds_event_map_abstract_session_title($vars) {
+  $abstract = $vars['entity'];
+  $output = '';
+
+  if (!empty($abstract->field_event_sub_session)) {
+    $wrapper = entity_metadata_wrapper('node', $abstract);
+    $event_subsession = entity_metadata_wrapper('node', $abstract)->field_event_sub_session->value();
+    $event_session = entity_metadata_wrapper('node', $event_subsession)->field_event_session->value();
+    $output = $event_session->title;
+  }
+
+  return $output;
+}
+
+/**
+ * DS Theme function
+ * Add the google map of the event location.
+ */
+function theme_ds_event_map_map($vars) {
+  $node = $vars['entity'];
+  $wrapper = entity_metadata_wrapper('node', $node);
+
+   // Add the map.
+
+    $lat = NULL; $long = NULL;
+    if (isset($node->location['latitude']) && is_numeric($node->location['latitude']) &&
+        isset($node->location['longitude']) && is_numeric($node->location['longitude'])
+        && ($node->location['latitude'] != 0.0000 || $node->location['longitude'] != 0.0000)) {
+      $lat = $node->location['latitude'];
+      $long = $node->location['longitude'];
+    }
+    elseif (isset($node->location['postal_code']) && $node->location['postal_code']) {
+      $url ="http://maps.googleapis.com/maps/api/geocode/xml?address=" . preg_replace('/ /', '%20', check_plain($node->location['postal_code'])) . "&sensor=false";
+      $result = simplexml_load_file(url($url));
+      $lat = (float) $result->result->geometry->location->lat;
+      $long = (float) $result->result->geometry->location->lng;
+    }
+    if (is_numeric($lat) && is_numeric($long)) {
+      $output = array(
+        '#markup' => '<div id="map_canvas" style="height:260px; width:720px"></div>',
+        '#weight' => 2.5,
+        '#attached' => array(
+          'js'  => array(
+                    rmets_system_get_protocol() . '://maps.googleapis.com/maps/api/js?sensor=false' => array('type' => 'external'),
+                    drupal_get_path('module', 'event_map') . '/assets/js/event_map.js'),
+        ),
+      );
+      $location = $wrapper->field_summary_location->value();
+      $location = check_markup($location['value'], $location['format']);
+      drupal_add_js(array('event_map' => array('markers' => array($location, $lat, $long))), 'setting');
+    }
+
+
+  return isset($output) ? drupal_render($output) : '';
+}
+
+/**
+ * Implements hook_views_api().
+ * We are specifying this here ourself as we want to include a views
+ * template directory.
+ */
+function event_map_views_api() {
+  return array(
+    "version" => "3.0",
+    'template path' => drupal_get_path('module', 'event_map') . '/views-templates',
+  );
+}
+
+/**
+ * Implements hook_menu_block_tree_alter().
+ * When the menu block is created, rebuild the menu depending on
+ * the current contexts.
+ */
+function event_map_menu_block_tree_alter(&$tree, $config) {
+  if (context_isset('context', 'events')) {
+    // We want the left hand menu to appear on people profile pages.
+    // It changes depending on context.
+
+    // Taken the following lines out following menu
+    // items not being placed correctly in events.
+    /*
+    $q = $_GET['q'];
+    menu_set_active_item(drupal_get_normal_path('events'));
+    $tree = menu_tree_page_data('main-menu');
+    $_GET['q'] = $q;
+     */
+  }
+}
+
+/**
+ * Determine if an event has any sessions attached to it.
+ *
+ * @param object $event
+ *   A fully loaded event node.
+ *
+ * @return boolean
+ *   TRUE if it has any sessions, FALSE if not.
+ */
+function _event_map_event_has_sessions($event) {
+  $session_nids = _event_map_get_event_session_nids($event);
+  return !empty($session_nids);
+}
+
+/**
+ * Determine if an event has any abstracts attached to it.
+ *
+ * @param int $event_nid
+ *   The nid of the event node in question
+ *
+ * @return boolean
+ *   TRUE if event has abstracts
+ */
+function _event_map_event_has_abstracts($event_nid) {
+  $query = new EntityFieldQuery();
+  $count = $query->entityCondition('entity_type', 'node')
+    ->entityCondition('bundle', 'event_abstract')
+    ->propertyCondition('status', 1)
+    ->fieldCondition('field_event', 'target_id', $event_nid, '=')
+    ->count()
+    ->execute();
+  return $count > 0;
+}
+
+/**
+ * Get a list of event_session nids linked to a given
+ * event node.
+ *
+ * @param object $event
+ *   A fully loaded event node
+ *
+ * @return array
+ *   An array of nids each should be a node nid linked
+ *   to the specified event node.
+ */
+function _event_map_get_event_session_nids($event) {
+  $query = new EntityFieldQuery();
+  $result = $query->entityCondition('entity_type', 'node')
+    ->entityCondition('bundle', 'event_session')
+    ->fieldCondition('field_event', 'target_id', $event->nid, '=')
+    ->execute();
+
+  if (isset($result['node']) && !empty($result['node'])) {
+    return array_keys($result['node']);
+  }
+
+  return array();
+}
+
+/**
+ * Implements hook_ctools_plugin_directory().
+ */
+function event_map_ctools_plugin_directory($module, $plugin) {
+  if ($module == 'entityreference') {
+    return 'plugins/' . $plugin;
+  }
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function event_map_form_event_abstract_node_form_alter(&$form, &$form_state, $form_id) {
+  if (!user_access('administer rmets events')) {
+    // Add JS which hides all the group file uploaded group
+    // fields from normal users.
+    ctools_add_js('event_map_abstract_submission', 'event_map');
+
+    // Hide the revision information text box.
+    $form['revision_information']['#access'] = FALSE;
+  }
+
+  if (isset($_GET['field_event']) && is_numeric($_GET['field_event'])) {
+    $event = node_load($_GET['field_event']);
+    if (!empty($event) && $event->type == 'event') {
+      $breadcrumb = drupal_get_breadcrumb();
+      $breadcrumb[] = l($event->title, 'node/' . $event->nid);
+      $breadcrumb[] = t('Event abstract');
+      drupal_set_breadcrumb($breadcrumb);
+    }
+  }
+
+  $event = NULL;
+  if (isset($_GET['field_event'])) {
+    // If this is the first time of asking
+    // we will be able to get the event from
+    // the url.
+    $options = array('' => 'N/A');
+    $event = $_GET['field_event'];
+    if (!empty($event)) {
+      $options += _event_map_event_themes($event);
+      $form_state['event_map_data']['event_themes'] = $options;
+    }
+  }
+  elseif (isset($form_state['event_map_data']['event_themes'])) {
+    // Otherwise we may have lost the reference to $_GET
+    // e.g. by pressing "Add another author".
+    // We rely on what was saved when we did have it.
+    // You still can't change event and get the new themes
+    // but it's less broken that it was.
+    $options = $form_state['event_map_data']['event_themes'];
+  }
+  elseif (!empty($form_state['node']->field_event['und'][0]['target_id'])) {
+    $event = $form_state['node']->field_event['und'][0]['target_id'];
+    $options = array('' => 'N/A');
+    if (!empty($event)) {
+      $options += _event_map_event_themes($event);
+      $form_state['event_map_data']['event_themes'] = $options;
+    }
+  }
+  else {
+    $options = array('' => 'N/A');
+  }
+  $form['field_event_abstract_theme']['und']['#options'] = $options;
+  if (isset($form_state['node']->field_event_abstract_theme['und'][0]['tid'])) {
+    $form['field_event_abstract_theme']['und']['#default_value'] = $form_state['node']->field_event_abstract_theme['und'][0]['tid'];
+  }
+}
+
+/**
+ * Implements hook_field_info().
+ *
+ * Field settings:
+ * - allowed_values: a list array of one or more vocabulary trees:
+ *   - vocabulary: a vocabulary machine name.
+ *   - parent: a term ID of a term whose children are allowed. This should be
+ *     '0' if all terms in a vocabulary are allowed. The allowed values do not
+ *     include the parent term.
+ *
+ */
+function event_map_field_info() {
+  return array(
+    'event_map_theme_reference' => array(
+      'label' => t('Event theme reference'),
+      'description' => t('This field stores a reference to a taxonomy term.'),
+      'default_widget' => 'options_buttons',
+      'default_formatter' => 'taxonomy_term_reference_link',
+      'settings' => array(),
+      'behaviors' => array(
+        'multiple values' => FIELD_BEHAVIOR_CUSTOM,
+      ),
+      'property_type' => 'taxonomy_term',
+      'property_callbacks' => array('entity_metadata_field_term_reference_callback'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_field_widget_info_alter().
+ */
+function event_map_field_widget_info_alter(&$info) {
+  $info['options_select']['field types'][] = 'event_map_theme_reference';
+  $info['options_buttons']['field types'][] = 'event_map_theme_reference';
+}
+
+/**
+ * Implements hook_field_is_empty().
+ */
+function event_map_field_is_empty($item, $field) {
+  return taxonomy_field_is_empty($item, $field);
+}
+
+/**
+ * Implements hook_field_formatter_info_alter().
+ */
+function event_map_field_formatter_info_alter(&$info) {
+  $info['taxonomy_term_reference_link']['field types'][] = 'event_map_theme_reference';
+  $info['taxonomy_term_reference_plain']['field types'][] = 'event_map_theme_reference';
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ * Make the theme selection on the all abstracts form a drop down containing
+ * the themes for the current event.
+ */
+function event_map_form_views_exposed_form_alter(&$form, &$form_state, $form_id) {
+  if ($form['#id'] == 'views-exposed-form-event-abstracts-event-abstracts-for-session') {
+    $event = _event_map_get_event_from_url();
+    if ($event) {
+      $themes = array('' => 'All') + _event_map_event_themes($event);
+      $form['field_event_abstract_theme_tid']['#type'] = 'select';
+      $form['field_event_abstract_theme_tid']['#options'] = $themes;
+      $form['field_event_abstract_theme_tid']['#multiple'] = FALSE;
+      unset($form['field_event_abstract_theme_tid']['#size']);
+    }
+  }
+}
+
+/**
+ * Get all the themes for an event.
+ *
+ * @param object $event
+ *   The event node.
+ *
+ * @return array
+ *   Key is the tid and value is the taxonomy name (string)
+ */
+function _event_map_event_themes($event) {
+  $options = array();
+  if (isset(entity_metadata_wrapper('node', $event)->field_themes)) {
+    $themes = entity_metadata_wrapper('node', $event)->field_themes->value();
+    foreach ($themes as $theme) {
+      $options[$theme->tid] = $theme->name;
+    }
+  }
+  return $options;
+}

@@ -1,0 +1,42 @@
+<?php
+
+require_once drupal_get_path('module', 'group_file_attachments') . '/group_file_attachments.field.inc';
+
+/**
+ * @file
+ * Field module functionality for the Group File Attachments module.
+ */
+
+/**
+ * Implementation of hook_theme
+ */
+function group_file_attachments_theme() {
+  return array(
+    'file_formatter_group_file_attachments' => array(
+      'variables' => array('items' => NULL),
+    ),
+    'group_file_attachments_widgets' => array(
+      'variables' => array('items' => NULL),
+    ),
+    'group_file_attachments_group' => array(
+      'variables' => array('group' => NULL),
+      'path' => drupal_get_path('module', 'group_file_attachments') . '/theme',
+      'template' => 'group-file-attachments-group',
+    ),
+    'group_file_attachments' => array(
+      'variables' => array('groups' => NULL, 'entity' => NULL),
+      'path' => drupal_get_path('module', 'group_file_attachments') . '/theme',
+      'template' => 'group-file-attachments',
+    )
+  );
+}
+
+/**
+ * Implements hook_file_download().
+ *
+ * This function takes an extra parameter $field_type so that it may
+ * be re-used by other File-like modules, such as Image.
+ */
+function group_file_attachments_file_download($uri) {
+  return file_file_download($uri, 'group_file_attachments');
+}

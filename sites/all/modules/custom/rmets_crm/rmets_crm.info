@@ -1,0 +1,6 @@
+name = RMetS CRM
+description = RMetS CRM integration module. The CRM uses MS Dynamics.
+core = 7.x
+package = RMetS
+dependencies[] = wsif
+dependencies[] = xautoload

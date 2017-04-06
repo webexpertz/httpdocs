@@ -1,0 +1,38 @@
+<?php
+
+
+/**
+ * Implements hook_feeds_plugins()
+ */
+function feeds_db_feeds_plugins() {
+  $info = array();
+  $info['DBFetcher'] = array(
+    'name' => t('Database Fetcher'),
+    'description' => t('Used to fetch data directly from an external database'),
+    'handler' => array(
+      'parent' => 'FeedsFetcher',
+      'class' => 'DBFetcher',
+      'file' => 'DBFetcher.inc',
+      'path' => drupal_get_path('module', 'feeds_db') . '/plugins',
+    ),
+  );
+  $info['DBParser'] = array(
+    'name' => t('Database Parser'),
+    'description' => t('Used to parse data fetched from database by Database Fetcher'),
+    'handler' => array(
+      'parent' => 'FeedsParser',
+      'class' => 'DBParser',
+      'file' => 'DBParser.inc',
+      'path' => drupal_get_path('module', 'feeds_db') . '/plugins',
+    ),
+  );
+  return $info;
+}
+
+
+/**
+ * Implements hook_enable()
+ */
+function feeds_db_enable() {
+  cache_clear_all('plugins:feeds:plugins', 'cache');
+}

@@ -1,0 +1,18 @@
+<?php
+/**
+ * @file
+ * Install hooks for rmets_membership_subscriptions.
+ */
+
+/**
+ * Added rules for sending emails.
+ */
+function rmets_membership_subscriptions_update_7001() {
+  features_revert(
+    array(
+      'rmets_subscription' => array(
+        'rules_config',
+      ),
+    )
+  );
+}

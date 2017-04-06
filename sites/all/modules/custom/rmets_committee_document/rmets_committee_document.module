@@ -1,0 +1,232 @@
+<?php
+
+/**
+ * @file
+ * Code for the rmets_committee_document feature.
+ */
+
+include_once 'rmets_committee_document.features.inc';
+
+/**
+ * Implements hook_node_view().
+ */
+function rmets_committee_document_node_view($node, $view_mode, $langcode) {
+  if ($node->type == 'committee_meeting' && $view_mode == 'full') {
+    $committee_term = entity_metadata_wrapper('node', $node)->field_committee->value();
+    $breadcrumb = drupal_get_breadcrumb();
+    $breadcrumb[] = l('Committees', 'committee-papers');
+    $breadcrumb[] = l(t('@committee Meetings', array('@committee' => $committee_term->name)), 'committee-papers/' . preg_replace('/[^a-z]/', '-', strtolower($committee_term->name)));
+    drupal_set_breadcrumb($breadcrumb);
+  }
+  elseif ($node->type == 'committee_document' && $view_mode == 'full') {
+    $meeting = entity_metadata_wrapper('node', $node)->field_meeting_reference->value();
+    $committee_term = entity_metadata_wrapper('node', $meeting)->field_committee->value();
+    $breadcrumb = drupal_get_breadcrumb();
+    $breadcrumb[] = l('Committees', 'committee-papers');
+    $breadcrumb[] = l(t('@committee Meetings', array('@committee' => $committee_term->name)), 'committee-papers/' . preg_replace('/[^a-z]/', '-', strtolower($committee_term->name)));
+    $breadcrumb[] = l(t('Meeting'), 'node/' . $meeting->nid);
+    drupal_set_breadcrumb($breadcrumb);
+  }
+}
+
+/**
+ * Implements hook_node_access().
+ */
+function rmets_committee_document_node_access($node, $op, $account) {
+  $type = is_string($node) ? $node : $node->type;
+
+  if ($op == 'view') {
+    if ($type == 'committee_meeting' && is_object($node)) {
+      if (user_access('administer committee meetings')) {
+        return NODE_ACCESS_ALLOW;
+      }
+      return _rmets_committee_document_meeting_access($node, $op, $account) ? NODE_ACCESS_ALLOW : NODE_ACCESS_DENY;
+    }
+    elseif ($type == 'committee_document') {
+      if (user_access('administer committee meetings')) {
+        return NODE_ACCESS_ALLOW;
+      }
+      if (!in_array($op, array('delete'))) {
+        return _rmets_committee_document_meeting_document_access($node, $op, $account) ? NODE_ACCESS_ALLOW : NODE_ACCESS_DENY;
+      }
+    }
+  }
+}
+
+/**
+ * Implements hook_permission().
+ */
+function rmets_committee_document_permission() {
+  return array(
+    'administer committee meetings' => array(
+      'title' => t('Super access to committee meetings'),
+      'description' => t('Without this permission you will not be able to set the meeting a document referes to unless you create it from the meeting node.'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_field_access().
+ * Only super admins can change the meeting a document is referenced to.
+ */
+function rmets_committee_document_field_access($op, $field, $entity_type, $entity, $account) {
+  if ($field['field_name'] == 'field_meeting_reference' && !user_access('administer committee meetings', $account)) {
+    return FALSE;
+  }
+  elseif ($field['field_name'] == 'field_council_access') {
+    $ref = isset($_GET['field_meeting_reference']) && is_numeric($_GET['field_meeting_reference']) ? $_GET['field_meeting_reference'] : FALSE;
+    if ($ref) {
+      $meeting = node_load($ref);
+      if (_rmets_committee_document_node_is_council_meeting($meeting)) {
+        return FALSE;
+      }
+    }
+    elseif (isset($entity->field_meeting_reference) && _rmets_committee_document_node_is_council_meeting(entity_metadata_wrapper('node', $entity)->field_meeting_reference->value())) {
+      return FALSE;
+    }
+  }
+  elseif ($field['field_name'] == 'field_committee_membership' && !user_access('administer committee meetings')) {
+    // Don't let non-admins set their committee membership status.
+    return FALSE;
+  }
+}
+
+/**
+ * Check if a user is on a committee.
+ *
+ * @param user $account
+ *   The Drupal user account object.
+ * @param int $tid
+ *   The committee term tid you want to check they are on.
+ *
+ * @return boolean
+ *   TRUE or FALSE.
+ */
+function rmets_committee_document_user_on_committee($account, $tid) {
+  if (!isset($account->field_committee_membership)) {
+    $account = user_load($account->uid);
+  }
+
+  $account_wrapper = entity_metadata_wrapper('user', $account);
+  $user_committees = $account_wrapper->field_committee_membership->value();
+
+  foreach ($user_committees as $user_committee_term) {
+    if ($user_committee_term->tid == $tid) {
+      return TRUE;
+    }
+  }
+  return FALSE;
+}
+
+/**
+ * Check a user can access a meeting.
+ */
+function _rmets_committee_document_meeting_access($node, $op, $account) {
+  $account = user_load($account->uid);
+  $account_wrapper = entity_metadata_wrapper('user', $account);
+  $node_wrapper = entity_metadata_wrapper('node', $node);
+  $user_committees = $account_wrapper->field_committee_membership->value();
+  $node_committee_term = $node_wrapper->field_committee->value();
+
+  foreach ($user_committees as $user_committee_term) {
+    if ($user_committee_term->tid == $node_committee_term->tid && ($op == 'view' || $node->uid == $account->uid)) {
+      // Allow members of the committee to see the meeting.
+      return TRUE;
+    }
+    elseif (strtolower($user_committee_term->name) == 'council' && $op == 'view') {
+      // Allow council to view a meeting.
+      return TRUE;
+    }
+  }
+  return FALSE;
+}
+
+/**
+ * Check a user can access a meeting document.
+ *
+ * @param string|object $document
+ *   This is a node or the type string on an insert.
+ */
+function _rmets_committee_document_meeting_document_access($document, $op, $account) {
+  $account = user_load($account->uid);
+  if (is_string($document)) {
+    if (user_access('administer committee meetings', $account)) {
+      return TRUE;
+    }
+
+    if (!user_access('administer committee meetings', $account) && ($op != 'create' || !isset($_GET['field_meeting_reference']) || !is_numeric($_GET['field_meeting_reference']))) {
+      return FALSE;
+    }
+
+    $meeting = node_load($_GET['field_meeting_reference']);
+    if (!$meeting) {
+      return FALSE;
+    }
+  }
+  else {
+    $document_wrapper = entity_metadata_wrapper('node', $document);
+    $meeting = $document_wrapper->field_meeting_reference->value();
+  }
+
+  if ($meeting && _rmets_committee_document_meeting_access($meeting, 'view', $account)) {
+    $account_wrapper = entity_metadata_wrapper('user', $account);
+    $meeting_wrapper = entity_metadata_wrapper('node', $meeting);
+    $user_committees = $account_wrapper->field_committee_membership->value();
+    $council_allowed = isset($document_wrapper) ? $document_wrapper->field_council_access->value() : FALSE;
+    $meeting_committee_term = $meeting_wrapper->field_committee->value();
+
+    foreach ($user_committees as $user_committee_term) {
+      if ($user_committee_term->tid == $meeting_committee_term->tid && ($op == 'view' || $op == 'create' || $document->uid == $account->uid)) {
+        // Allow members of the committee to see the meeting document.
+        return TRUE;
+      }
+      elseif ($council_allowed && strtolower($user_committee_term->name) == 'council' && $op == 'view') {
+        // Allow council to view a meeting.
+        return TRUE;
+      }
+    }
+  }
+  return FALSE;
+}
+
+/**
+ * Helper function to find out if a node is a council meeting.
+ *
+ * @param node $meeting
+ *   A loaded node that might be a meeting.
+ *
+ * @return boolean
+ *   TRUE if this is a council meeting.
+ */
+function _rmets_committee_document_node_is_council_meeting($meeting) {
+  if ($meeting && $meeting->type == 'committee_meeting') {
+    return strtolower(entity_metadata_wrapper('node', $meeting)->field_committee->value()->name) == 'council';
+  }
+  return FALSE;
+}
+
+/**
+ * Helper function to decide if this user is a committee member
+ * or editor.
+ *
+ * @param object $account
+ *   The user account to check.
+ */
+function _rmets_committee_document_user_can_access_committees($account) {
+  if (user_access('administer committee meetings', $account)) {
+    return TRUE;
+  }
+
+  $account = user_load($account->uid);
+  $account_wrapper = entity_metadata_wrapper('user', $account);
+  $user_committees = $account_wrapper->field_committee_membership->value();
+  return !empty($user_committees);
+}
+
+/**
+ * Implements hook_user_login().
+ */
+function rmets_committee_document_user_login(&$edit, $account) {
+  $user_wrapper = rmets_membership_user_get_user_wrapper($account);
+  $user_wrapper->syncCommitteeMemberships();
+}

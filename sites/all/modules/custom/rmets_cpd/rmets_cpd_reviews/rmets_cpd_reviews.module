@@ -1,0 +1,335 @@
+<?php
+
+/**
+ * @file
+ * RMetS CPD review module file.
+ */
+
+use Drupal\rmets_membership_user\EntityWrapper\User\UserWrapper;
+
+/**
+ * Implements hook_permission().
+ */
+function rmets_cpd_reviews_permission() {
+  return array(
+    'view own cpd reviews' => array(
+      'title' => 'View & Edit Own CPD reviews',
+      'description' => 'Allows user to be able to view & edit their own CPD reviews'
+    ),
+    'review other users cpd reviews' => array(
+      'title' => 'Review Other Users CPD reviews',
+      'description' => 'Allows user to be able to review other users CPD reviews, when they are assigned as a reviewer'
+    ),
+    'view edit other users cpd reviews' => array(
+      'title' => 'View & Edit Other Users CPD reviews',
+      'description' => 'Allows user to be able to view & edit other users CPD reviews'
+    ),
+  );
+}
+
+/**
+ * Controls access for the reviewers admin listing page.
+ *
+ * @see views_plugin_access_cpd_reviews_reviewer plugin.
+ */
+function _rmets_cpd_reviews_access_review_reviewer_view() {
+
+  if (user_access('view edit other users cpd reviews') || user_access('view cpd reports')) {
+    return TRUE;
+  }
+
+  global $user;
+  $is_own_account = arg(1) == $user->uid;
+  $is_reviewer = user_access('review other users cpd reviews');
+
+  if ($is_own_account && $is_reviewer) {
+    return TRUE;
+  }
+
+  return FALSE;
+}
+
+/**
+ * Implements hook_views_plugins().
+ */
+function rmets_cpd_reviews_views_plugins() {
+  $plugins = array(
+    'access' => array(
+      'access_cpd_reviews_reviewer' => array(
+        'title' => t('RMetS CPD reviews reviewer'),
+        'handler' => 'views_plugin_access_cpd_reviews_reviewer',
+        'path' => drupal_get_path('module', 'rmets_cpd_reviews') . '/plugins/views',
+      ),
+    ),
+  );
+  return $plugins;
+}
+
+/*
+ * Implements hook_custom_theme().
+ */
+function rmets_cpd_reviews_custom_theme() {
+  $menu_item = menu_get_item();
+
+  $is_cpd_review_add_page = $menu_item['path'] == 'node/add/cpd-report-review';
+  $is_cpd_review_edit_page = $menu_item['path'] == 'node/%/edit' && $menu_item['page_arguments'][0]->type == 'cpd_report_review';
+
+  if ($is_cpd_review_add_page || $is_cpd_review_edit_page) {
+    return 'rmets';
+  }
+
+}
+
+/**
+ * Gets the review access permission needed for this module.
+ *
+ * @return string
+ *   The access permission for this module.
+ */
+function _rmets_cpd_report_review_review_access_permission() {
+  return 'review other users cpd reviews';
+}
+
+/**
+ * Implements hook_form_alter().
+ */
+function rmets_cpd_reviews_form_cpd_report_review_node_form_alter(&$form, &$form_state, $form_id) {
+  // Set the group tab descriptions from the variables.
+  _rmets_cpd_node_group_descriptions($form);
+
+  _rmets_cpd_node_add_field_status_description($form);
+
+  // If its a node add form, and field_user is prepopulated, prepopulate other user fields.
+  $is_node_add = is_null($form['nid']['#value']);
+  $is_field_user_prepopulated = !empty($form['field_user'][LANGUAGE_NONE][0]['target_id']['#default_value']);
+  if ($is_node_add && $is_field_user_prepopulated) {
+    $account = user_load($form['field_user'][LANGUAGE_NONE][0]['target_id']['#entity']->uid);
+    $account_wrapper = entity_metadata_wrapper('user', $account);
+    $form['field_forenames'][LANGUAGE_NONE][0]['value']['#default_value'] = $account_wrapper->field_forenames->value();
+    $form['field_last_name'][LANGUAGE_NONE][0]['value']['#default_value'] = $account_wrapper->field_surname->value();
+    $form['field_email'][LANGUAGE_NONE][0]['email']['#default_value'] = $account_wrapper->mail->value();
+  }
+
+  // Update the first 'none' option for report type to be 'other'.
+  $form['field_crm_accreditation_type'][LANGUAGE_NONE][0]['value']['#options'][''] = 'Other';
+
+  // Hide unneeded fields.
+  _rmets_cpd_node_hide_fields($form);
+  // Update the 'add cpd record' button name.
+  _rmets_cpd_node_change_add_cpd_records_button_name($form);
+  // Add the required field asterix marker.
+  _rmets_cpd_node_add_required_field_markers($form);
+
+  // Add the apply button.
+  $is_admin = user_access('view edit other users cpd reviews');
+  $submit_function = '_rmets_cpd_reviews_node_report_review_submit';
+  _rmets_cpd_node_add_apply_button($form, $is_node_add, $is_admin, $submit_function);
+  global $user;
+  $account = user_load($user->uid);
+  $user_wrapper = new UserWrapper($account);
+
+  if (!$is_admin && !$user_wrapper->hasAccreditationTypes()) {
+    unset($form['apply']);
+    unset($form['#fieldgroups']['group_submit']);
+    $message_received = &drupal_static(__FUNCTION__);
+    if ($message_received != TRUE) {
+      $message_received = TRUE;
+      drupal_set_message('You will not be able to submit a report because we don\'t have a record of your accreditations.', 'warning');
+    }
+  }
+}
+
+/**
+ * Implements hook_form_BASE_FORM_ID_alter for hook_form_alter().
+ *
+ * This saves additional information about the submit review required fields..
+ */
+function rmets_cpd_reviews_form_field_ui_field_edit_form_alter(&$form, &$form_state, $form_id) {
+  _rmets_cpd_form_field_ui_field_edit_form_alter($form, $form_state, $form_id, 'cpd_report_review');
+
+  /*if ($form['#instance']['entity_type'] != 'node' || $form['#instance']['bundle'] != 'cpd_report_review') {
+    return;
+  }
+
+  $form['instance']['settings']['rmets_cpd_reviews_settings'] = array(
+    '#type' => 'fieldset',
+    '#title' => 'RMetS review settings.',
+  );
+
+  $form['instance']['settings']['rmets_cpd_reviews_settings']['submit_app_required'] = array(
+    '#type' => 'checkbox',
+    '#title' => 'Required, when the application or review is submitted',
+    '#default_value' => isset($form['#instance']['settings']['rmets_cpd_reviews_settings']['submit_app_required']) && $form['#instance']['settings']['rmets_cpd_reviews_settings']['submit_app_required'] == 1,
+  );*/
+
+}
+
+/**
+ * Form submittion handler for rmets_cpd_reviews_form_cpd_report_review_node_form_alter().
+ *
+ * @see rmets_cpd_reviews_form_cpd_report_review_node_form_alter().
+ */
+function _rmets_cpd_reviews_node_report_review_submit($form, &$form_state){
+
+  // Change form state.
+  $state_pending = _rmets_cpd_get_workflow_status_id_by_name('Pending');
+  $form_state['values']['field_status']['und'][0]['workflow']['workflow_sid'] = $state_pending;
+
+  // Submit form.
+  node_form_submit($form, $form_state);
+}
+
+/**
+ * Implements hook_node_presave().
+ */
+function rmets_cpd_reviews_node_presave($node) {
+
+  if ($node->type != 'cpd_report_review') {
+    return;
+  }
+
+  // The node title field is hidden on the form.
+  // This creates a title so the content listing page is not useless.
+  $account = user_load($node->field_user[LANGUAGE_NONE][0]['target_id']);
+  $account_wrapper = new UserWrapper($account);
+  $node_wrapper = entity_metadata_wrapper('node', $node);
+
+  // Application type.
+  if (isset($node->field_crm_accreditation_type[LANGUAGE_NONE][0])) {
+    $accreditation_item_id = $node_wrapper->field_crm_accreditation_type->value();
+    /** @var \Drupal\rmets_crm\Model\AccreditationItem $accreditation_item */
+    $accreditation_item = $account_wrapper->getAccreditationApplicationDetails($accreditation_item_id);
+    if (empty($accreditation_item)) {
+      form_set_error('field_type_of_accreditation', 'There was a problem getting the relevant report type information from CRM.');
+      return;
+    }
+    $product_title = $accreditation_item->getName() . ' - ' ;
+  }
+  else {
+    $product_title = '';
+  }
+
+  if (is_object($account)) {
+    $node->title = 'CPD Report - ' . $product_title. $account_wrapper->field_forenames->value() . ' ' . $account_wrapper->field_surname->value() . ' - ' . ' (' . $node->nid . ') ' . date('d M Y', $node->created);
+  }
+  else {
+    $node->title = 'CPD Report - ' . $product_title . ' - NO USER (' . $node->nid . ') ' . date('d M Y', $node->created);
+  }
+
+  try {
+    $next_cpd_date = $node_wrapper->field_next_cpd_submission_date->value();
+
+    if (!empty($next_cpd_date['value'])) {
+      $account_wrapper->field_cpd_report_submission_date->set($next_cpd_date);
+      $account_wrapper->save();
+    }
+  }
+  catch (Exception $e) {
+    if (user_access('administer cpd section')) {
+      drupal_set_message($e->getMessage(), 'error');
+    }
+    watchdog_exception('rmets_cpd_reviews', $e);
+  }
+
+}
+
+/**
+ * Implements hook_node_insert().
+ */
+function rmets_cpd_reviews_node_insert($node) {
+  if ($node->type != 'cpd_report_review') {
+    return;
+  }
+  drupal_register_shutdown_function('_rmets_cpd_reviews_node_post_insert', $node);
+}
+
+/**
+ * Perform a node_save after insert to set the nid in the title.
+ *
+ * @param $node
+ */
+function _rmets_cpd_reviews_node_post_insert($node) {
+  node_save($node);
+}
+
+/**
+ * Implements hook_workflow().
+ */
+function rmets_cpd_reviews_workflow($op, $id, $new_sid, $entity, $force, $entity_type = '', $field_name = '') {
+
+  if ($entity_type != 'node' || $entity->type != 'cpd_report_review') {
+    return;
+  }
+
+  // DEBUG:
+  // dpm(array($op, $id, $new_sid, $entity, $force, $entity_type, $field_name));
+
+  // Example usage:
+  /*
+  switch ($op) {
+    case 'transition permitted':
+      return TRUE;
+  }
+  */
+
+}
+
+/**
+ * Implements hook_cron().
+ *
+ * Send a CPD Review reminder email to users.
+ */
+function rmets_cpd_reviews_cron() {
+  $current_date = date('Y-m-d');
+  $last_processed_date = variable_get('rmets_cpd_review_last_email_reminder_sent', '');
+
+  // Check if the reminder emails have already been sent out today.
+  if ($current_date == $last_processed_date) {
+    return;
+  }
+
+  // Send the email reminders for relevant users.
+  _rmets_cpd_reviews_user_email_reminder();
+
+  // Set the last sent date.
+  variable_set('rmets_cpd_review_last_email_reminder_sent', date('Y-m-d'));
+}
+
+/**
+ * Finds the users that need to be sent an email and passes them to the rule.
+ */
+function _rmets_cpd_reviews_user_email_reminder() {
+  // Get all the cpd users that are due a review in the next 3 months and haven't
+  // been sent an email in the last 3 months.
+  $query = db_select('users', 'u');
+  $query->join('field_data_field_cpd_report_submission_date', 'nsd', 'u.uid = nsd.entity_id AND nsd.entity_type = :entity_type', array(':entity_type' => 'user'));
+  $query->leftJoin('field_revision_field_last_cpd_rep_remind_date', 'lrd', 'u.uid = lrd.entity_id AND lrd.entity_type = :entity_type', array(':entity_type' => 'user'));
+  $query->fields('u', array('uid'))
+    ->isNotNull('nsd.field_cpd_report_submission_date_value')
+    ->condition('nsd.field_cpd_report_submission_date_value', strtotime('+3 months'), '<=')
+    ->condition(
+      db_or()
+      ->condition('lrd.field_last_cpd_rep_remind_date_value', strtotime('-3 months'), '<')
+      ->isNull('lrd.field_last_cpd_rep_remind_date_value')
+    );
+
+  $result = $query->execute();
+  while($record = $result->fetchAssoc()) {
+    // Invoke the rule to send the email reminder for each user.
+    $user = user_load($record['uid']);
+    //printf("send email to %s (%s)\n", $user->email, $user->uid);
+    rules_invoke_event('rmets_cpd_reviews_user_review_due_reminder', $user);
+  }
+}
+
+/**
+ * Implements hook_views_pre_build().
+ */
+function rmets_cpd_reviews_views_pre_build($view) {
+  // Add the intro text to the header of the views.
+  if ($view->current_display == 'cpd_report_page') {
+    $intro_text = variable_get('rmets_' . $view->current_display . '_list_intro', '');
+    $intro_content = str_replace('[' . $view->current_display . '_intro_text]', $intro_text, $view->header['area_1']->options['content']);
+    $view->header['area_1']->options['content'] = $intro_content;
+  }
+}

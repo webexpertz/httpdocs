@@ -1,0 +1,14 @@
+<?php
+/**
+ * @file
+ * Install file for RMetS membership users.
+ */
+
+/**
+ * Remove the aeras of specialism field from the user account.
+ */
+function rmets_membership_user_update_7101() {
+  if ($instance = field_info_instance('user', 'field_areas_of_specialism', 'user')) {
+    field_delete_instance($instance);
+  }
+}

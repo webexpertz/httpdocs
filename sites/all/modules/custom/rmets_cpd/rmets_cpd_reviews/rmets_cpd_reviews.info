@@ -1,0 +1,6 @@
+name = "RMets CPD Reviews"
+description = The RMetS CPD Reviews
+core = 7.x
+package = RMetS
+
+files[] = plugins/views/views_plugin_access_cpd_reviews_reviewer.inc

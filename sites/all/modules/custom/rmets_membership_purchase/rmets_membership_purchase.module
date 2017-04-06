@@ -1,0 +1,1268 @@
+<?php
+
+include_once 'rmets_membership_purchase.features.inc';
+
+/**
+ * @file
+ * Relating to membership creation and renewal
+ */
+
+use Drupal\rmets_membership_purchase\EntityWrapper\CommerceProduct\CommerceProductWrapper;
+use Drupal\rmets_membership_user\EntityWrapper\User\UserWrapper;
+use Drupal\rmets_crm\Api\ApiServerException;
+use Drupal\rmets_crm\Api\Request\CreateContactSubscriptionRequest;
+use Drupal\rmets_crm\Api\Request\GetContactByEmailRequest;
+use Drupal\rmets_crm\Api\Request\ContactRequest;
+use Drupal\rmets_crm\Model\Subscription;
+use Drupal\rmets_crm\Model\MembershipPackagePrice;
+
+/**
+ * Implements hook_menu().
+ */
+function rmets_membership_purchase_menu() {
+  $items = array();
+
+  $items['membership/join'] = array(
+    'title' => 'Purchase Membership',
+    'description' => 'Description',
+    'access callback' => 'user_access',
+    'access arguments' => array('access content'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('rmets_membership_purchase_purchase_form'),
+    'type' => MENU_CALLBACK,
+  );
+
+  $items['membership/gift'] = array(
+    'title' => 'Purchase Gift Membership',
+    'description' => 'Description',
+    'access callback' => 'user_access',
+    'access arguments' => array('access content'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('rmets_membership_purchase_gift_purchase_form', 2),
+    'type' => MENU_CALLBACK,
+  );
+
+  $items['membership/renew'] = array(
+    'title' => 'Renew Membership',
+    'description' => 'Description',
+    'access callback' => 'user_access',
+    'access arguments' => array('access content'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('rmets_membership_purchase_purchase_form'),
+    'type' => MENU_CALLBACK,
+  );
+
+  return $items;
+}
+
+/**
+ * Helper function to get the commerce membership product.
+ *
+ * @return bool|mixed
+ */
+function rmets_membership_purchase_get_commerce_product() {
+  return commerce_product_load_by_sku('SMRT');
+}
+
+/**
+ * Helper function to get the metadata wrapper for the membership product.
+ *
+ * @param null $commerce_product
+ * @return \Drupal\rmets_membership_purchase\EntityWrapper\CommerceProduct\CommerceProductWrapper
+ */
+function rmets_membership_purchase_get_commerce_wrapper($commerce_product = NULL) {
+  if (empty($commerce_product)) {
+    $commerce_product = rmets_membership_purchase_get_commerce_product();
+  }
+  $wrapper = &drupal_static(__FUNCTION__);
+  if (!isset($wrapper)) {
+    $wrapper = new CommerceProductWrapper($commerce_product);
+  }
+  return $wrapper;
+}
+
+/**
+ * Helper function to include the form_options we use in the purchase form.
+ */
+function rmets_membership_purchase_load_form_options() {
+  module_load_include('inc', 'rmets_membership_purchase', 'rmets_membership_purchase.form_options');
+}
+
+function rmets_membership_purchase_user_can_renew($user_wrapper, $form_state) {
+  try {
+    rmets_crm_get_api();
+  } catch (ApiServerException $e) {
+    drupal_set_message(t('Unable to connect to our membership database.'), 'error');
+    return FALSE;
+  }
+
+  if (rmets_membership_purchase_is_renewal_form($form_state)) {
+    $user_wrapper->updateFromCrm();
+    if (!$user_wrapper->isValidCrmContact()) {
+      drupal_set_message('You must be a member in order to use the renewal form', 'error');
+      return FALSE;
+    }
+  }
+  return TRUE;
+}
+
+/**
+ * Purchase membership.
+ */
+function rmets_membership_purchase_purchase_form($form, &$form_state) {
+  global $user;
+  $account = user_load($user->uid);
+  $user_wrapper = rmets_membership_user_get_user_wrapper($account);
+  $accreditations = '';
+  $accreditation_name = NULL;
+
+  $breadcrumb = drupal_get_breadcrumb();
+  $breadcrumb[] = l('Membership', 'membership');
+  $breadcrumb[] = rmets_membership_purchase_is_renewal_form($form_state) ? t('Renew Membership') : t('Purchase Membership');
+  drupal_set_breadcrumb($breadcrumb);
+
+  if (!rmets_membership_purchase_user_can_renew($user_wrapper, $form_state)) {
+    return array();
+  }
+
+  rmets_membership_purchase_load_form_options();
+  $wrapper = rmets_membership_purchase_get_commerce_wrapper();
+
+  if (isset($_GET['subscription'])) {
+    $subscription_id = $_GET['subscription'];
+  }
+  else if (!empty($form_state['values']['subscription_id'])) {
+    $subscription_id = $form_state['values']['subscription_id'];
+  }
+  else {
+    $subscription_id = NULL;
+  }
+  $form_state['values']['subscription_id'] = $subscription_id;
+
+  if (rmets_membership_purchase_is_renewal_form($form_state)) {
+    if (empty($subscription_id)) {
+      drupal_set_message('There is no subscription assigned to this membership renewal. Please contact the membership department for further assistance.', 'error');
+      return array();
+    }
+    else {
+      /** @var Subscription $current_membership_subscription */
+      $current_membership_subscription = rmets_membership_subscriptions_get_subscription($subscription_id);
+      $form_state['values']['package_id'] = $current_membership_subscription->getPackageID();
+      /** @var MembershipPackagePrice $current_membership_package */
+      $current_membership_package = rmets_membership_subscriptions_get_membership_by_id($current_membership_subscription->getMembershipPackagePriceID());
+      $accreditition_id = $current_membership_subscription->getAccreditationItemId();
+      //$accreditition_id = '39bbf6b3-96cd-e411-80cf-00155d8738c4';
+      if (!empty($accreditition_id)) {
+        $accreditation_item = current(rmets_membership_subscriptions_get_accreditation_by_id($accreditition_id)->getIterator());
+        $accreditations = '<h2>Your Accreditation</h2><p>' . $accreditation_item->getName() . ' (&pound;<span id="accred-amount">' . number_format($accreditation_item->getAmount(), 2) . '</span>)</p>';
+        $accreditation_name = $accreditation_item->getName();
+      }
+    }
+    $subscription_options[$current_membership_subscription->getMembershipPackagePriceID()] = $current_membership_package->getName() . ' (£' . $current_membership_package->getAmountFormatted() . ')';
+    $js_options[$current_membership_subscription->getMembershipPackagePriceID()] = $current_membership_package->getAmount();
+    drupal_add_js(array('rmets_membership_purchase' => array('subscription_prices' => $js_options)), 'setting');
+  }
+  else {
+    $membership_options = rmets_membership_purchase_subscription_options($wrapper);
+  }
+
+  $journal_options = rmets_membership_purchase_journal_options($wrapper, $user_wrapper, $form_state);
+  $student_and_fellow_types = rmets_membership_purchase_get_special_types($wrapper);
+
+  $form = array();
+  $form['markup'] = array(
+    '#markup' => 'Your membership cost is &pound;<span id="your-price">0</span>',
+  );
+  $form['form_type'] = array(
+    '#type' => 'value',
+    '#value' => rmets_membership_purchase_is_renewal_form($form_state) ? 'renewal' : 'registration',
+  );
+
+  $form['subscription_id'] = array(
+    '#type' => 'value',
+    '#value' => $subscription_id,
+  );
+
+  $form['accreditation_name'] = array(
+    '#type' => 'value',
+    '#value' => $accreditation_name,
+  );
+
+  if (!rmets_membership_purchase_is_renewal_form($form_state)) {
+    $form['product'] = array(
+      '#weight' => '0',
+      '#type' => 'select',
+      '#multiple' => 0,
+      '#size' => 0,
+      '#title' => 'Membership Type',
+      '#title_display' => 'before',
+      '#required' => '1',
+      '#description' => 'Choose your membership type',
+      '#options' => $membership_options,
+      '#ajax' => array(
+        'callback' => 'rmets_membership_purchase_dependent_dropdown_callback',
+        'wrapper' => 'dropdown-second-replace',
+      ),
+      '#default_value' => isset($_GET['product']) ? $_GET['product'] : '',
+    );
+  }
+  else {
+    $form['product'] = array(
+      '#weight' => '0',
+      '#type' => 'select',
+      '#multiple' => 0,
+      '#size' => 0,
+      '#title' => 'Membership Type',
+      '#title_display' => 'before',
+      '#required' => '1',
+      '#description' => 'Choose your membership type',
+      '#options' => $subscription_options,
+      '#default_value' => isset($_GET['product']) ? $_GET['product'] : '',
+      '#prefix' => '<div class="hidden">',
+      '#suffix' => '</div>',
+    );
+
+    $form['preselected_product'] = array(
+      '#markup' => '<h2>Your Membership Package</h2><p>' . $current_membership_package->getName() . ' (&pound;<span>' . $current_membership_package->getAmountFormatted() . '</span>)</p>' .
+      $accreditations,
+    );
+  }
+
+  $form['journal'] = array(
+    '#type' => 'checkboxes',
+    '#options' => $journal_options['options'],
+    '#title' => 'Journal Options',
+    '#description' => 'Select journal options',
+    '#default_value' => $journal_options['defaults'],
+    '#prefix' => '<div id="dropdown-second-replace">',
+    '#suffix' => '</div>',
+  );
+
+  $form['reciprocal_organisation'] = array(
+    '#type' => 'select',
+    '#options' => rmets_membership_purchase_get_reciprocal_organisation_options(),
+    '#prefix' => '<div class="show-to-reciprocals">',
+    '#suffix' => '</div>',
+    '#title' => 'Please select your reciprocal organisation ' . theme('form_required_marker', array()),
+  );
+
+  $form['reciprocal_membership_number'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Please select your membership number at the reciprocal organisation ' . theme('form_required_marker', array()),
+    '#title_display' => 'before',
+    '#description' => '',
+    '#prefix' => '<div class="show-to-reciprocals">',
+    '#suffix' => '</div>',
+  );
+
+  $hide_to_students = !empty($form_state['values']['product']) && isset($students[$form_state['values']['product']]) ? '' : 'hidden';
+
+  $form['enterprise_connector_userdef_GraduationDt'] = array (
+    '#type' => 'date_popup',
+    '#title' => 'Approximate graduation date ' . theme('form_required_marker', array()),
+    '#title_display' => 'before',
+    '#date_format' => 'd/m/Y',
+    '#description' => 'Please tell us the approximate date your course ends (when you graduate).',
+    '#required' => FALSE,
+    '#date_year_range' => '-0:+10',
+    '#year_textfield' => 0,
+    '#default_value' => '',
+    '#timezone' => 'site',
+    '#prefix' => '<div class="' . $hide_to_students . ' show-to-students">',
+    '#suffix' => '</div>'
+  );
+  if (!rmets_membership_purchase_is_renewal_form($form_state)) {
+    $form['enterprise_connector_userdef_HeardofRMetSby'] = array(
+      '#title' => 'How did you hear about RMetS?',
+      '#title_display' => 'before',
+      '#required' => '1',
+      '#description' => '',
+      '#empty_value' => '',
+      '#options' => $user_wrapper->getHearAboutRmetsOptions(),
+      '#type' => 'select',
+    );
+    $form['enterprise_connector_attribute_2'] = array (
+      '#title' => 'Please select your interests',
+      '#title_display' => 'before',
+      '#required' => '0',
+      //'#description' => 'Hold down the control key to select multiple entries.',
+      '#empty_value' => '',
+      '#options' => $user_wrapper->getInterestTypeOptions(),//rmets_membership_purchase_options('interests'),
+      '#type' => 'select',
+      '#multiple' => TRUE,
+    );
+    $form['enterprise_connector_userdef_Receiveemails'] = array (
+      '#title' => 'Would you like to receive email updates from the society?',
+      '#type' => 'checkbox',
+      '#default_value' => 1,
+    );
+  }
+  $form['Title'] = array (
+    '#title' => 'Title',
+    '#title_display' => 'before',
+    '#required' => '1',
+    '#description' => '',
+    '#options' => $user_wrapper->getTitleOptions(),
+    '#default_value' => 'Mr',
+    '#type' => 'select',
+  );
+  $form['Forenames'] = array (
+    '#type' => 'textfield',
+    '#title' => 'Forenames',
+    '#title_display' => 'before',
+    '#default_value' => '',
+    '#required' => '1',
+    '#field_prefix' => NULL,
+    '#field_suffix' => NULL,
+    '#description' => '',
+  );
+  $form['Surname'] = array (
+    '#type' => 'textfield',
+    '#title' => 'Surname',
+    '#title_display' => 'before',
+    '#default_value' => '',
+    '#required' => '1',
+    '#field_prefix' => NULL,
+    '#field_suffix' => NULL,
+    '#description' => '',
+  );
+
+  $hide_from_students = !empty($form_state['values']['product']) && isset($student_and_fellow_types['students'][$form_state['values']['product']]) ? 'hidden' : '';
+  $hide_from_corporates = !empty($form_state['values']['product']) && isset($student_and_fellow_types['corporates'][$form_state['values']['product']]) ? 'hidden' : '';
+
+  if (!rmets_membership_purchase_is_renewal_form($form_state)) {
+    $form['Occupation'] = array(
+      '#type' => 'textfield',
+      '#title' => 'Occupation',
+      '#title_display' => 'before',
+      '#default_value' => '',
+      '#required' => '0',
+      '#description' => '',
+      '#prefix' => '<div class="hide-from-students hide-from-corporates ' . $hide_from_students . ' ' . $hide_from_corporates . '">',
+      '#suffix' => '</div>',
+    );
+  }
+  $form['Company_name'] = array (
+    '#type' => 'textfield',
+    '#title' => 'Company name',
+    '#title_display' => 'before',
+    '#default_value' => '',
+    '#required' => '0',
+    '#description' => '',
+    '#prefix' => '<div class="show-to-corporates hidden">',
+    '#suffix' => '</div>',
+  );
+  if (!rmets_membership_purchase_is_renewal_form($form_state)) {
+    $form['DateOfBirth'] = array(
+      '#type' => 'date_popup',
+      '#date_format' => 'd/m/Y',
+      '#title' => 'Date of Birth' . theme_form_required_marker(array()),
+      '#title_display' => 'before',
+      '#description' => 'Your date of birth',
+      '#required' => FALSE,
+      '#date_year_range' => '-110:+1',
+      '#year_textfield' => 0,
+      '#default_value' => '',
+      '#timezone' => 'site',
+      '#prefix' => '<div class="hide-from-corporates ' . $hide_from_corporates . '">',
+      '#suffix' => '</div>',
+    );
+  }
+  $form['email'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Email Address',
+    '#default_value' => $user_wrapper->getEmail(),
+    '#required' => '1',
+  );
+  $address_desc = (!rmets_membership_purchase_is_renewal_form($form_state)) ? 'This is the delivery or mailing address for the new member and is where all correspondence from the Society will be sent' : 'This is where all correspondence from the Society will be sent';
+  $form['address'] = array (
+    '#type' => 'fieldset',
+    '#title' => 'Address',
+    '#title_display' => NULL,
+    '#description' => $address_desc,
+    '#collapsible' => 0,
+    '#collapsed' => 0,
+    'Address1' =>
+      array (
+        '#type' => 'textfield',
+        '#title' => 'Address 1',
+        '#title_display' => 'before',
+        '#default_value' => '',
+        '#required' => '1',
+        '#field_prefix' => NULL,
+        '#field_suffix' => NULL,
+        '#description' => '',
+      ),
+    'Address2' =>
+      array (
+        '#type' => 'textfield',
+        '#title' => 'Address 2',
+        '#title_display' => 'before',
+        '#default_value' => '',
+        '#required' => '0',
+        '#field_prefix' => NULL,
+        '#field_suffix' => NULL,
+        '#description' => '',
+      ),
+    'Town' =>
+      array (
+        '#type' => 'textfield',
+        '#title' => 'Town',
+        '#title_display' => 'before',
+        '#default_value' => '',
+        '#required' => '1',
+        '#field_prefix' => NULL,
+        '#field_suffix' => NULL,
+        '#description' => '',
+      ),
+    'County' =>
+      array (
+        '#type' => 'textfield',
+        '#title' => 'County',
+        '#title_display' => 'before',
+        '#default_value' => '',
+        '#required' => '0',
+        '#field_prefix' => NULL,
+        '#field_suffix' => NULL,
+        '#description' => '',
+      ),
+    'PostCode' =>
+      array (
+        '#type' => 'textfield',
+        '#title' => 'Post Code / Zip Code',
+        '#title_display' => 'before',
+        '#default_value' => '',
+        '#required' => '0',
+        '#field_prefix' => NULL,
+        '#field_suffix' => NULL,
+        '#description' => '',
+      ),
+    'CountryCode' =>
+      array (
+        '#title' => 'Country',
+        '#title_display' => 'before',
+        '#required' => '1',
+        '#description' => '',
+        '#options' => $user_wrapper->getCountryOptions(),
+        '#default_value' => $user_wrapper->getCountry(),
+        '#type' => 'select',
+      ),
+    'Telephone1' =>
+      array (
+        '#type' => 'textfield',
+        '#title' => 'Telephone',
+        '#title_display' => 'before',
+        '#default_value' => '',
+        '#required' => '0',
+        '#field_prefix' => NULL,
+        '#field_suffix' => NULL,
+        '#description' => '',
+      ),
+    'MobileTelephone' =>
+      array (
+        '#type' => 'textfield',
+        '#title' => 'Mobile telephone number',
+        '#title_display' => 'before',
+        '#default_value' => '',
+        '#required' => '0',
+        '#field_prefix' => NULL,
+        '#field_suffix' => NULL,
+        '#description' => '',
+      ),
+  );
+
+
+  if (rmets_membership_purchase_is_renewal_form($form_state)) {
+    $form['donation'] = array(
+      '#title' => 'Donation',
+      '#type' => 'textfield',
+      '#default_value' => '0.00',
+      '#required' => '0',
+      '#field_prefix' => '&pound;',
+      '#description' => 'I would like to make a donation to the RMetS',
+    );
+  }
+  else {
+    $form['type_of_membership'] = array(
+      '#title' => 'I am a new member',
+      '#required' => '1',
+      '#description' => 'This is for new members only. Existing members please log in to your account to renew',
+      '#type' => 'checkbox',
+      //'#options' => array('n' =>)
+    );
+    $form['charter_by_laws'] = array(
+      '#title' => 'I have read and accept the Charter and By Laws',
+      '#required' => '1',
+      '#description' => 'I agree that I will be governed by The Charter and By-Laws of the Society, and that I will advance the objects of The Society.
+<a href="/sites/rmets.org/files/Charter_and_Bylaws_2015.pdf" target="_blank">Charter and By Laws</a>',
+      '#type' => 'checkbox',
+    );
+  }
+  $form['#attached'] = array('js' => array(drupal_get_path('module', 'rmets_membership_purchase') . '/assets/js/calculate_price.js'));
+
+
+  $form['giftaid'] = array(
+    '#title' => 'I am a UK resident and would like to gift aid my membership.',
+    '#description' => 'Please refer to  <a href="https://www.gov.uk/donating-to-charity/gift-aid">the government guidelines on gift aid</a> if you are unsure.',
+    '#type' => 'checkbox',
+  );
+
+  $form['receipt'] = array(
+    '#markup' => '<p>' . t('If you would like a receipt please contact the Society on 0118 956 8500 or email !email.', array('!email' => l('membership@rmets.org', 'mailto:membership@rmets.org'))) . '</p>',
+  );
+
+  if (!rmets_membership_purchase_is_renewal_form($form_state)) {
+
+    $hide_to_fellows = !empty($form_state['values']['product']) && isset($student_and_fellow_types['fellows'][$form_state['values']['product']]) ? '' : 'hidden';
+    $form['sponsors_wrapper'] = array(
+      '#type' => 'fieldset',
+      '#title' => 'Sponsors',
+      '#prefix' => '<div class="show-to-fellow ' . $hide_to_fellows  . '">',
+      '#suffix' => '</div>',
+    );
+
+    for ($i = 1; $i < 3; $i++) {
+      $firstsecond = ($i === 1) ? 'first' : 'second';
+      $form['sponsors_wrapper']["sponsors$i"] = array(
+        '#type' => 'textfield',
+        '#title' => "Sponsor $i name " . theme('form_required_marker', array()),
+        '#title_display' => 'before',
+        '#default_value' => '',
+        '#required' => '0',
+        '#description' => 'Please provide the name of your ' . $firstsecond . ' sponsor.',
+      );
+
+      $form['sponsors_wrapper']["sponsorsemail$i"] = array(
+        '#type' => 'textfield',
+        '#title' => "Sponsor $i email address " . theme('form_required_marker', array()),
+        '#title_display' => 'before',
+        '#default_value' => '',
+        '#required' => '0',
+        '#description' => 'Please provide the email address of your ' . $firstsecond . ' sponsor.',
+      );
+
+      $form['sponsors_wrapper']["sponsorsmembernumber$i"] = array(
+        '#type' => 'textfield',
+        '#title' => "Sponsor $i membership number",
+        '#title_display' => 'before',
+        '#default_value' => '',
+        '#required' => '0',
+        '#description' => 'Please provide the membership number of your ' . $firstsecond . ' sponsor.',
+      );
+    }
+  }
+
+  $membership_types = array('students', 'fellows', 'reciprocals', 'corporates');
+  foreach ($membership_types AS $membership_type) {
+    if (isset($student_and_fellow_types[$membership_type])) {
+      $form[$membership_type] = array(
+        '#type' => 'value',
+        '#value' => $student_and_fellow_types[$membership_type],
+      );
+    }
+  }
+
+  $form['price_to_pay'] = array(
+    '#type' => 'hidden',
+    '#weight' => 19,
+  );
+
+  $form['#after_build'] = array(
+    'rmets_membership_purchase_call_after_build',
+  );
+
+  $form['markup2'] = array(
+    '#markup' => '<div>Your membership cost is &pound;<span id="your-price2">0</span></div>',
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Submit',
+    '#weight' => 20,
+  );
+
+  if (rmets_membership_purchase_is_renewal_form($form_state)) {
+    rmets_membership_purchase_add_defaults_for_renewal($form, $form_state, $user_wrapper);
+  }
+
+  return $form;
+}
+
+function rmets_membership_purchase_is_renewal_form($form_state) {
+  return ((arg(0) == 'membership' && arg(1) == 'renew') || (isset($form_state['values']['form_type']) && $form_state['values']['form_type'] == 'renewal'));
+}
+
+/**
+ * After build we need to call these functions to make sure the
+ * price is correct in the case of failed validation.
+ */
+function rmets_membership_purchase_call_after_build($form, $form_state) {
+  global $user;
+  $account = user_load($user->uid);
+  $user_wrapper = rmets_membership_user_get_user_wrapper($account);
+  $wrapper = rmets_membership_purchase_get_commerce_wrapper();
+
+  rmets_membership_purchase_load_form_options();
+  rmets_membership_purchase_subscription_options($wrapper);
+  rmets_membership_purchase_journal_options($wrapper, $user_wrapper, $form_state);
+
+  return $form;
+}
+
+/**
+ * Submit callback for the Purchase Form.
+ */
+function rmets_membership_purchase_purchase_form_validate(&$form, &$form_state) {
+  if (
+    !empty($form_state['values']['product']) &&
+    isset($form_state['values']['students'][$form_state['values']['product']]) &&
+    empty($form_state['values']['enterprise_connector_userdef_GraduationDt'])
+  ) {
+    form_set_error('enterprise_connector_userdef_GraduationDt', 'You must set a graduation date');
+  }
+  elseif (
+    !empty($form_state['values']['product']) &&
+    isset($form_state['values']['fellows'][$form_state['values']['product']]) &&
+    !rmets_membership_purchase_is_renewal_form($form_state) &&
+    (
+      empty($form_state['values']['sponsors1'])
+      || empty($form_state['values']['sponsors2'])
+      || empty($form_state['values']['sponsorsemail1'])
+      || empty($form_state['values']['sponsorsemail2'])
+    )
+  ) {
+    form_set_error('sponsors1', 'You must specify two sponsors');
+    form_set_error('sponsors2', '');
+    form_set_error('sponsorsemail1', '');
+    form_set_error('sponsorsemail2', '');
+  }
+  elseif (!empty($form_state['values']['product']) &&
+    !isset($form_state['values']['corporates'][$form_state['values']['product']]) &&
+    empty($form_state['values']['DateOfBirth']) &&
+    !rmets_membership_purchase_is_renewal_form($form_state)
+  ) {
+    form_set_error('DateOfBirth', 'Date of Birth field is required');
+  }
+  elseif (
+    !empty($form_state['values']['product']) &&
+    isset($form_state['values']['reciprocals'][$form_state['values']['product']]) &&
+    (
+      empty($form_state['values']['reciprocal_organisation'])
+      || empty($form_state['values']['reciprocal_membership_number'])
+    )
+  ) {
+    form_set_error('reciprocal_organisation', 'If you select a reciprocal product, you must specify the details of the reciprocal organisation');
+    form_set_error('reciprocal_membership_number', '');
+  }
+
+  if (!empty($form_state['values']['DateOfBirth']) && strtotime($form_state['values']['DateOfBirth']) < -2208988800) {
+    form_set_error('DateOfBirth', 'Your date of birth is too early. Please contact RMetS for assistance.');
+  }
+}
+
+/**
+ * Submit callback for the Purchase Form.
+ */
+function rmets_membership_purchase_purchase_form_submit(&$form, &$form_state) {
+  global $user;
+  $product = rmets_membership_purchase_get_commerce_product();
+  $order = commerce_order_new($user->uid, 'checkout_checkout');
+
+  // Save an address for the user.
+  $new_profile = commerce_customer_profile_new('billing');
+  $profile_wrapper = entity_metadata_wrapper('commerce_customer_profile', $new_profile);
+  $profile_wrapper->uid = $user->uid;
+  $profile_wrapper->commerce_customer_address->country = rmets_membership_purchase_convert_country_name_to_country_code($form_state['values']['CountryCode']);
+  $profile_wrapper->commerce_customer_address->name_line = $form_state['values']['Forenames'] . ' ' . $form_state['values']['Surname'];
+  $profile_wrapper->commerce_customer_address->first_name = $form_state['values']['Forenames'];
+  $profile_wrapper->commerce_customer_address->last_name = $form_state['values']['Surname'];
+  //$profile_wrapper->commerce_customer_address->organisation_name = $organisation;
+  $profile_wrapper->commerce_customer_address->administrative_area = $form_state['values']['County'];
+  //$profile_wrapper->commerce_customer_address->sub_administrative_area = $sub_administrative_area;
+  $profile_wrapper->commerce_customer_address->locality = $form_state['values']['Town'];
+  //$profile_wrapper->commerce_customer_address->dependent_locality = $dependent_locality;
+  $profile_wrapper->commerce_customer_address->postal_code = $form_state['values']['PostCode'];
+  $profile_wrapper->commerce_customer_address->thoroughfare = $form_state['values']['Address1'];
+  $profile_wrapper->commerce_customer_address->premise = $form_state['values']['Address2'];
+  commerce_customer_profile_save($new_profile);
+  $order->commerce_customer_billing['und'][0]['profile_id'] = $new_profile->profile_id;
+
+  $order->mail = $form_state['values']['email'];
+
+  // Save the order to get its ID.
+  commerce_order_save($order);
+
+  $data = $form_state['values'];
+  $data['title_of_item'] = 'Membership: ' . preg_replace('/\(.*\)/', '', $form['product']['#options'][$form_state['values']['product']]);
+
+  $journals = array();
+  foreach ($form_state['values']['journal'] AS $journal) {
+    if ($journal !== 0) {
+      $journals[] = $form['journal']['#options'][$journal];
+    }
+  }
+  $journals = preg_replace('/ ?\([^\)]*\)/', '', implode(', ', $journals));
+  if (!empty($journals)) {
+    $data['title_of_item'] .= '(With journals: ' . $journals . ')';
+  }
+  if (isset($form_state['values']['accreditation_name']) && !empty($form_state['values']['accreditation_name'])) {
+    $data['title_of_item'] .= ' & Accreditation: ' . $form_state['values']['accreditation_name'];
+  }
+  if (!empty($form_state['values']['donation']) && $form_state['values']['donation'] >= 0.01) {
+    $data['title_of_item'] .= ' (Includes a donation of: £' . $form_state['values']['donation'] . ')';
+  }
+
+  // Make a line item containing the product.
+  $line_item = commerce_product_line_item_new($product, 1, $order->order_id, $data, 'rmets_membership_smartimpact');
+
+  // Save the line item to get its ID.
+  commerce_line_item_save($line_item);
+
+  // If the user is not logged in, ensure the order ID is stored in the session.
+  if (!$user->uid) {
+    commerce_cart_order_session_save($order->order_id);
+  }
+
+  // Add the line item to the order using fago's rockin' wrapper.
+  $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
+  $order_wrapper->commerce_line_items[] = $line_item;
+
+  // Save the order again to update its line item reference field.
+  commerce_order_save($order);
+
+  // Redirect to the order's checkout form. Obviously, if this were a
+  // form submit handler, you'd just set $form_state['redirect'].
+  drupal_goto('checkout/' . $order->order_id);
+}
+
+/**
+ * Form handler for Gift membership.
+ */
+function rmets_membership_purchase_gift_purchase_form($form, &$form_state) {
+  global $user;
+  $account = $user;
+  $user_wrapper = new UserWrapper(user_load($account->uid));
+
+  $breadcrumb = drupal_get_breadcrumb();
+  $breadcrumb[] = l('Membership', 'membership');
+  $breadcrumb[] = t('Purchase Gift Membership');
+  drupal_set_breadcrumb($breadcrumb);
+
+  rmets_membership_purchase_load_form_options();
+  $wrapper = rmets_membership_purchase_get_commerce_wrapper();
+
+  $membership_options = rmets_membership_purchase_subscription_options($wrapper, TRUE);
+  $journal_options = rmets_membership_purchase_journal_options($wrapper, $user_wrapper, $form_state);
+  $student_and_fellow_types = rmets_membership_purchase_get_special_types($wrapper);
+
+  $form = array();
+  $form['markup'] = array(
+    '#markup' => 'Your membership cost is &pound;<span id="your-price">0</span>',
+  );
+  $form['form_type'] = array(
+    '#type' => 'value',
+    '#value' => 'gift',
+  );
+
+  $form['product'] = array (
+    '#weight' => '0',
+    '#type' => 'select',
+    '#multiple' => 0,
+    '#size' => 0,
+    '#title' => 'Membership Type',
+    '#title_display' => 'before',
+    '#required' => '1',
+    '#description' => 'Choose your membership type',
+    '#options' => $membership_options,
+    '#ajax' => array(
+      'callback' => 'rmets_membership_purchase_dependent_dropdown_callback',
+      'wrapper' => 'dropdown-second-replace',
+    ),
+    '#default_value' => isset($_GET['product']) ? $_GET['product'] : '',
+  );
+
+  $form['journal'] = array(
+    '#type' => 'checkboxes',
+    '#options' => $journal_options['options'],
+    '#title' => 'Journal Options',
+    '#description' => 'Select journal options',
+    '#default_value' => $journal_options['defaults'],
+    '#prefix' => '<div id="dropdown-second-replace">',
+    '#suffix' => '</div>',
+  );
+
+  $form['gift_from'] = array(
+    '#type' => 'fieldset',
+    '#title' => 'About you',
+    '#description' => 'Please provide details about the person making the purchase.',
+  );
+
+  $form['Title'] = array (
+    '#title' => 'Title',
+    '#title_display' => 'before',
+    '#required' => '1',
+    '#description' => '',
+    '#options' => $user_wrapper->getTitleOptions(),
+    '#default_value' => 'Mr',
+    '#type' => 'select',
+  );
+  $form['Forenames'] = array (
+    '#type' => 'textfield',
+    '#title' => 'Forenames',
+    '#title_display' => 'before',
+    '#default_value' => $user_wrapper->getForename(),
+    '#required' => '1',
+    '#field_prefix' => NULL,
+    '#field_suffix' => NULL,
+    '#description' => '',
+  );
+  $form['Surname'] = array (
+    '#type' => 'textfield',
+    '#title' => 'Surname',
+    '#title_display' => 'before',
+    '#default_value' => $user_wrapper->getSurname(),
+    '#required' => '1',
+    '#field_prefix' => NULL,
+    '#field_suffix' => NULL,
+    '#description' => '',
+  );
+  $form['email'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Email Address',
+    '#default_value' => $user_wrapper->getEmail(),
+    '#required' => '1',
+  );
+  $form['address'] = array (
+    '#type' => 'fieldset',
+    '#title' => 'Address',
+    '#title_display' => NULL,
+    '#description' => 'This is the delivery or mailing address for the purchaser and is where all correspondence from the Society will be sent',
+    '#collapsible' => 0,
+    '#collapsed' => 0,
+    'Address1' =>
+      array (
+        '#type' => 'textfield',
+        '#title' => 'Address 1',
+        '#title_display' => 'before',
+        '#default_value' => $user_wrapper->getAddress1(),
+        '#required' => '1',
+        '#field_prefix' => NULL,
+        '#field_suffix' => NULL,
+        '#description' => '',
+      ),
+    'Address2' =>
+      array (
+        '#type' => 'textfield',
+        '#title' => 'Address 2',
+        '#title_display' => 'before',
+        '#default_value' => $user_wrapper->getAddress2(),
+        '#required' => '0',
+        '#field_prefix' => NULL,
+        '#field_suffix' => NULL,
+        '#description' => '',
+      ),
+    'Town' =>
+      array (
+        '#type' => 'textfield',
+        '#title' => 'Town',
+        '#title_display' => 'before',
+        '#default_value' => $user_wrapper->getCity(),
+        '#required' => '1',
+        '#field_prefix' => NULL,
+        '#field_suffix' => NULL,
+        '#description' => '',
+      ),
+    'County' =>
+      array (
+        '#type' => 'textfield',
+        '#title' => 'County',
+        '#title_display' => 'before',
+        '#default_value' => $user_wrapper->getStateProvince(),
+        '#required' => '0',
+        '#field_prefix' => NULL,
+        '#field_suffix' => NULL,
+        '#description' => '',
+      ),
+    'PostCode' =>
+      array (
+        '#type' => 'textfield',
+        '#title' => 'Post Code / Zip Code',
+        '#title_display' => 'before',
+        '#default_value' => $user_wrapper->getPostCode(),
+        '#required' => '0',
+        '#field_prefix' => NULL,
+        '#field_suffix' => NULL,
+        '#description' => '',
+      ),
+    'CountryCode' =>
+      array (
+        '#title' => 'Country',
+        '#title_display' => 'before',
+        '#required' => '1',
+        '#description' => '',
+        '#options' => $user_wrapper->getCountryOptions(),
+        '#default_value' => $user_wrapper->getCountry(),
+        '#type' => 'select',
+      ),
+    'Telephone1' =>
+      array (
+        '#type' => 'textfield',
+        '#title' => 'Telephone',
+        '#title_display' => 'before',
+        '#default_value' => $user_wrapper->getBusinessPhone(),
+        '#required' => '0',
+        '#field_prefix' => NULL,
+        '#field_suffix' => NULL,
+        '#description' => '',
+      ),
+    'MobileTelephone' =>
+      array (
+        '#type' => 'textfield',
+        '#title' => 'Mobile telephone number',
+        '#title_display' => 'before',
+        '#default_value' => $user_wrapper->getMobileNumber(),
+        '#required' => '0',
+        '#field_prefix' => NULL,
+        '#field_suffix' => NULL,
+        '#description' => '',
+      ),
+  );
+
+  $form['gift_for'] = array(
+    '#type' => 'fieldset',
+    '#title' => 'About the new member',
+    '#description' => 'Please enter as much information as you can about the new member who is to receive this membership.',
+  );
+
+  $hide_to_students = !empty($form_state['values']['product']) && isset($students[$form_state['values']['product']]) ? '' : 'hidden';
+
+  $form['gift_for']['gift_for_enterprise_connector_userdef_GraduationDt'] = array (
+    '#type' => 'date_popup',
+    '#title' => 'Approximate graduation date ' . theme('form_required_marker', array()),
+    '#title_display' => 'before',
+    '#date_format' => 'd/m/Y',
+    '#description' => 'Please tell us the approximate date their course ends (when they graduate).',
+    '#required' => FALSE,
+    '#date_year_range' => '-0:+10',
+    '#year_textfield' => 0,
+    '#default_value' => '',
+    '#timezone' => 'site',
+    '#prefix' => '<div class="' . $hide_to_students . ' show-to-students">',
+    '#suffix' => '</div>'
+  );
+
+  $form['gift_for']['gift_for_Title'] = array (
+    '#title' => 'Title',
+    '#title_display' => 'before',
+    '#required' => '1',
+    '#description' => '',
+    '#options' => $user_wrapper->getTitleOptions(),
+    '#default_value' => 'Mr',
+    '#type' => 'select',
+  );
+  $form['gift_for']['gift_for_Forenames'] = array (
+    '#type' => 'textfield',
+    '#title' => 'Forenames',
+    '#title_display' => 'before',
+    '#default_value' => '',
+    '#required' => '1',
+    '#field_prefix' => NULL,
+    '#field_suffix' => NULL,
+    '#description' => '',
+  );
+  $form['gift_for']['gift_for_Surname'] = array (
+    '#type' => 'textfield',
+    '#title' => 'Surname',
+    '#title_display' => 'before',
+    '#default_value' => '',
+    '#required' => '1',
+    '#field_prefix' => NULL,
+    '#field_suffix' => NULL,
+    '#description' => '',
+  );
+  $form['gift_for']['gift_for_DateOfBirth'] = array (
+    '#type' => 'date_popup',
+    '#date_format' => 'd/m/Y',
+    '#title' => 'Date of Birth',
+    '#title_display' => 'before',
+    '#description' => 'Their date of birth',
+    '#date_year_range' => '-110:+1',
+    '#year_textfield' => 0,
+    '#default_value' => '',
+    '#timezone' => 'site',
+  );
+  $form['gift_for']['gift_for_email'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Email Address',
+    '#required' => '1',
+    '#default_value' => '',
+  );
+  $form['gift_for']['gift_for_address'] = array (
+    '#type' => 'fieldset',
+    '#title' => 'Address',
+    '#title_display' => NULL,
+    '#description' => 'This is the mailing address for the gift member and is where all correspondence from the Society will be sent',
+    '#collapsible' => 0,
+    '#collapsed' => 0,
+    'gift_for_Address1' =>
+      array (
+        '#type' => 'textfield',
+        '#title' => 'Address 1',
+        '#title_display' => 'before',
+        '#default_value' => '',
+        '#field_prefix' => NULL,
+        '#field_suffix' => NULL,
+        '#description' => '',
+      ),
+    'gift_for_Address2' =>
+      array (
+        '#type' => 'textfield',
+        '#title' => 'Address 2',
+        '#title_display' => 'before',
+        '#default_value' => '',
+        '#field_prefix' => NULL,
+        '#field_suffix' => NULL,
+        '#description' => '',
+      ),
+    'gift_for_Town' =>
+      array (
+        '#type' => 'textfield',
+        '#title' => 'Town',
+        '#title_display' => 'before',
+        '#default_value' => '',
+        '#field_prefix' => NULL,
+        '#field_suffix' => NULL,
+        '#description' => '',
+      ),
+    'gift_for_County' =>
+      array (
+        '#type' => 'textfield',
+        '#title' => 'County',
+        '#title_display' => 'before',
+        '#default_value' => '',
+        '#field_prefix' => NULL,
+        '#field_suffix' => NULL,
+        '#description' => '',
+      ),
+    'gift_for_PostCode' =>
+      array (
+        '#type' => 'textfield',
+        '#title' => 'Post Code / Zip Code',
+        '#title_display' => 'before',
+        '#default_value' => '',
+        '#field_prefix' => NULL,
+        '#field_suffix' => NULL,
+        '#description' => '',
+      ),
+    'gift_for_CountryCode' =>
+      array (
+        '#title' => 'Country',
+        '#title_display' => 'before',
+        '#description' => '',
+        '#options' => $user_wrapper->getCountryOptions(),
+        '#default_value' => $user_wrapper->getCountry(),
+        '#type' => 'select',
+      ),
+    'gift_for_Telephone1' =>
+      array (
+        '#type' => 'textfield',
+        '#title' => 'Telephone',
+        '#title_display' => 'before',
+        '#default_value' => '',
+        '#field_prefix' => NULL,
+        '#field_suffix' => NULL,
+        '#description' => '',
+      ),
+    'gift_for_MobileTelephone' =>
+      array (
+        '#type' => 'textfield',
+        '#title' => 'Mobile telephone number',
+        '#title_display' => 'before',
+        '#default_value' => '',
+        '#field_prefix' => NULL,
+        '#field_suffix' => NULL,
+        '#description' => '',
+      ),
+  );
+
+  $form['charter_by_laws'] = array(
+    '#title' => 'I have read and accept the Charter and By Laws',
+    '#required' => '1',
+    '#description' => 'I agree that I will be governed by The Charter and By-Laws of the Society, and that I will advance the objects of The Society.
+<a href="/sites/rmets.org/files/Charter_and_Bylaws_2015.pdf" target="_blank">Charter and By Laws</a>',
+    '#type' => 'checkbox',
+  );
+
+  $form['#attached'] = array('js' => array(drupal_get_path('module', 'rmets_membership_purchase') . '/assets/js/calculate_price.js'));
+
+  $form['giftaid'] = array(
+    '#title' => 'I am a UK resident and would like to gift aid my membership.',
+    '#description' => 'Please refer to  <a href="https://www.gov.uk/donating-to-charity/gift-aid">the government guidelines on gift aid</a> if you are unsure.',
+    '#type' => 'checkbox',
+  );
+
+  $form['receipt'] = array(
+    '#markup' => '<p>' . t('If you would like a receipt please contact the Society on 0118 956 8500 or email !email.', array('!email' => l('membership@rmets.org', 'mailto:membership@rmets.org'))) . '</p>',
+  );
+
+  $form['students'] = array(
+    '#type' => 'value',
+    '#value' => $student_and_fellow_types['students'],
+  );
+
+  $form['price_to_pay'] = array(
+    '#type' => 'hidden',
+    '#weight' => 19,
+  );
+
+  $form['#after_build'] = array(
+    'rmets_membership_purchase_call_after_build',
+  );
+
+  $form['markup2'] = array(
+    '#markup' => '<div>Your membership cost is &pound;<span id="your-price2">0</span></div>',
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Submit',
+    '#weight' => 20,
+  );
+
+  return $form;
+}
+
+/**
+ * Form validation handler for gift purchase form.
+ */
+function rmets_membership_purchase_gift_purchase_form_validate($form, &$form_state) {
+  $gift_user = user_load_by_mail($form_state['values']['gift_for_email']);
+  if (!empty($gift_user)) {
+    form_set_error('gift_for_email', 'There is already a member with this email address, so you are unable to purchase new membership for them. Please check the email address and try again.');
+  }
+}
+
+/**
+ * Submit handler for the gift purchase form.
+ */
+function rmets_membership_purchase_gift_purchase_form_submit(&$form, &$form_state) {
+  rmets_membership_purchase_purchase_form_submit($form, $form_state);
+}
+
+/**
+ * The ajaxification of the journal dropdown.
+ */
+function rmets_membership_purchase_dependent_dropdown_callback(&$form, &$form_state) {
+  foreach ($form['journal']['#default_value'] AS $id => $default) {
+    if (isset($form['journal'][$id])) {
+      $form['journal'][$id]['#checked'] = 1;
+    }
+  }
+  return $form['journal'];
+}
+
+/**
+ * Implements hook_commerce_cart_line_item_refresh().
+ *
+ * Alter the price in basket and checkout.
+ */
+function rmets_membership_purchase_commerce_cart_line_item_refresh($line_item, $order_wrapper) {
+  if ($line_item->line_item_label == 'SMRT') {
+    $price = $line_item->data['price_to_pay'] * 100;
+    $line_item->commerce_unit_price[LANGUAGE_NONE]['0']['amount'] = $price;
+    //alter the base_price component
+    $line_item->commerce_unit_price[LANGUAGE_NONE]['0']['data']['components']['0']['price']['amount'] = $price;
+  }
+}
+
+/**
+ * Implements hook_commerce_line_item_type_info_alter().
+ */
+function rmets_membership_purchase_commerce_line_item_type_info_alter(&$line_item_types) {
+  $line_item_types['rmets_membership_smartimpact']['callbacks']['title'] = 'rmets_membership_purchase_smartimpact_product_title';
+}
+
+function rmets_membership_purchase_smartimpact_product_title($line_item) {
+  return check_plain($line_item->data['title_of_item']);
+}
+
+/**
+ * Implements hook_user_login().
+ */
+function rmets_membership_purchase_user_login(&$edit, $account) {
+  if ($account->access == 0) {
+    $user_wrapper = new UserWrapper($account);
+    $user_wrapper->updateFromCrm();
+    $contact_id = $user_wrapper->getCrmContactId();
+    if (empty($contact_id)) {
+      $user_wrapper->setGiftAid(1);
+      $user_wrapper->setMarketingMaterials(1);
+      $user_wrapper->save();
+    }
+  }
+}
+
+/**
+ * Convert country name to ISO country code
+ *
+ * @param $country - country name. Can be of any case
+ */
+function rmets_membership_purchase_convert_country_name_to_country_code($country) {
+  // Necessary for country_get_list().
+  require_once DRUPAL_ROOT . '/includes/locale.inc';
+  $countries = country_get_list();
+  return array_search(strtolower($country), array_map('strtolower', $countries));
+}
+
+/**
+ * Implements hook_commerce_smartimpact().
+ */
+function rmets_membership_purchase_commerce_smartimpact($order) {
+  $account = user_load($order->uid);
+
+  $order_wrapper = entity_metadata_wrapper("commerce_order", $order);
+  $line_item_id = $order_wrapper->commerce_line_items[0]->line_item_id->value();
+  if (is_numeric($line_item_id) && $line_item_id > 0) {
+    $line_item = commerce_line_item_load($line_item_id);
+  }
+  if (isset($line_item->data['product']) && $line_item->type == 'rmets_membership_smartimpact') {
+    try {
+      // Create or update the contact.
+      $user_wrapper = new UserWrapper($account);
+      // Add the member role to a user on registration.
+      if (($line_item->data['form_type'] == 'registration')) {
+        $user_wrapper->addMemberRole();
+      }
+      rmets_membership_purchase_create_or_update_membership($user_wrapper, $line_item);
+      if (in_array($line_item->data['form_type'], array('registration', 'gift'))) {
+        $gift_item = ($line_item->data['form_type'] == 'gift');
+        rmets_membership_purchase_create_subscription_for_user($user_wrapper, $line_item, $gift_item);
+      }
+      else {
+        rmets_membership_purchase_mark_subscription_paid($user_wrapper, $line_item);
+        rmets_membership_purchase_remove_journal_subscriptions($user_wrapper, $line_item);
+        rmets_membership_purchase_add_journal_subscriptions($user_wrapper, $line_item);
+      }
+
+    }
+    catch (Exception $e) {
+      watchdog('rmets_membership_purchase', 'this happened<pre>' . print_r($order, 1) . '</pre>');
+    }
+  }
+}
+
+/**
+ * Implements hook_commerce_line_item_default_types().
+ */
+function rmets_membership_purchase_commerce_line_item_default_types() {
+  $items = array(
+    'rmets_membership_smartimpact' => array(
+      'name' => 'RMetS Membership Smartimpact',
+      'description' => 'A customizable product line item type.',
+      'product' => TRUE,
+      'add_form_submit_value' => 'Add product',
+      'base' => 'commerce_product_line_item',
+    ),
+  );
+  return $items;
+}

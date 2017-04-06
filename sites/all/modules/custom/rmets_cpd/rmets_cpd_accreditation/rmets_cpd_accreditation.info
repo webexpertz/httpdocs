@@ -1,0 +1,4 @@
+name = "RMets CPD Accreditation"
+description = The RMetS CPD Accreditation
+core = 7.x
+package = RMetS

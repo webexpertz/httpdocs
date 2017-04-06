@@ -1,0 +1,5 @@
+name = "RMetS Access"
+description = This module controls member access to content on the rmets site
+package = RMetS
+core = 7.x
+dependencies[]="rmets_crm"

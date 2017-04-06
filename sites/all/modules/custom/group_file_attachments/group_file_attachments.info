@@ -1,0 +1,8 @@
+name = Grouped File Attachments
+description = Allow the grouping of file attachments
+package = RMetS
+version = VERSION
+core = 7.x
+dependencies[] = field
+dependencies[] = file
+files[] = tests/group_file_attachments.test

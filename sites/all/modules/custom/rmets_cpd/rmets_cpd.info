@@ -1,0 +1,4 @@
+name = "RMets CPD"
+description = The RMetS CPD
+core = 7.x
+package = RMetS

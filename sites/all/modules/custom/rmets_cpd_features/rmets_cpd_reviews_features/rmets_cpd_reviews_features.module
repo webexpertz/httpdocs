@@ -1,0 +1,7 @@
+<?php
+/**
+ * @file
+ * Code for the RMetS CPD Reviews Features feature.
+ */
+
+include_once 'rmets_cpd_reviews_features.features.inc';

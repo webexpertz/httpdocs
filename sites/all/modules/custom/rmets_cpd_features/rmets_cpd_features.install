@@ -1,0 +1,119 @@
+<?php
+
+/**
+* @file
+ * Install and update hooks.
+ */
+
+/**
+ * Add permission for administer cpd section.
+ */
+function rmets_cpd_features_update_7001() {
+  features_revert(
+    array(
+      'rmets_cpd_features' => array(
+        'user_permission',
+        'ckeditor_profile',
+      ),
+    )
+  );
+}
+
+/**
+ * Add save edit module and settings.
+ */
+function rmets_cpd_features_update_7002() {
+  module_enable(array('save_edit'));
+  features_revert(
+    array(
+      'rmets_cpd_features' => array(
+        'user_permission',
+        'variable',
+      ),
+    )
+  );
+}
+
+/**
+ * Added 'cut', 'copy', 'paste' & 'Paste from word' to editor profile.
+ */
+function rmets_cpd_features_update_7003() {
+  features_revert(
+    array(
+      'rmets_cpd_features' => array(
+        'ckeditor_profile',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated permissions.
+ */
+function rmets_cpd_features_update_7004() {
+  features_revert(
+    array(
+      'rmets_cpd_features' => array(
+        'user_permission',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated fields.
+ * Updated permissions.
+ */
+function rmets_cpd_features_update_7005() {
+  features_revert(
+    array(
+      'rmets_cpd_features' => array(
+        'user_permission',
+        'field',
+        'field_instance',
+      ),
+    )
+  );
+}
+
+/**
+ * Added CPD Report reminder date field.
+ */
+function rmets_cpd_features_update_7006() {
+  features_revert(
+    array(
+      'rmets_cpd_features' => array(
+        'field',
+        'field_instance',
+      ),
+    )
+  );
+}
+
+/**
+ * Updated field permissions.
+ */
+function rmets_cpd_features_update_7007() {
+  features_revert(
+    array(
+      'rmets_cpd_features' => array(
+        'field',
+        'field_instance',
+        'user_permission',
+      ),
+    )
+  );
+}
+
+/**
+ * Update user permissions.
+ */
+function rmets_cpd_features_update_7008() {
+  features_revert(
+    array(
+      'rmets_cpd_features' => array(
+        'user_permission',
+      ),
+    )
+  );
+}

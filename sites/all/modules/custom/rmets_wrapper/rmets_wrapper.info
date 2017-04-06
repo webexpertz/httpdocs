@@ -1,0 +1,8 @@
+name = Rmets Wrapper
+description = The entity wrapper classes
+package = RMetS
+core = 7.x
+version = 7.x-1.x
+
+;files[] =
+;dependencies[] = 

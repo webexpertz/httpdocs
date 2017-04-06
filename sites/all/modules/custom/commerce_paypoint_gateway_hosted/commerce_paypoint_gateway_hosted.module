@@ -1,0 +1,427 @@
+<?php
+
+/**
+ * @file
+ * Provides an example payment method for Drupal Commerce for testing and
+ *   development.
+ */
+
+define('COMMERCE_PAYPOINT_CALLBACK', 'checkout/complete/commerce_paypoint_gateway_hosted');
+
+/**
+ * Implements hook_commerce_payment_method_info().
+ */
+function commerce_paypoint_gateway_hosted_commerce_payment_method_info() {
+  $payment_methods = array();
+
+  $payment_methods['commerce_paypoint_gateway_hosted'] = array(
+    'title' => t('Paypoint Professional Integration'),
+    'short_title' => t('PayPoint'),
+    'description' => t('PayPoint Professional Payments Standard'),
+    'offsite' => TRUE,
+    'active' => TRUE,
+    'offsite_autoredirect' => TRUE,
+  );
+
+  return $payment_methods;
+}
+
+/**
+ * Payment method callback; validate callback for the payment submission form.
+ *
+ * @param array $payment_method
+ *   An array of the current settings.
+ * @param array $pane_values
+ *   The current values of the pane.
+ * @param array $checkout_pane
+ *   The checkout pane array.
+ * @param object $order
+ *   The order object.
+ * @param array $charge
+ *   A price structure that needs to be charged.
+ */
+function commerce_paypoint_gateway_hosted_submit_form($payment_method, $pane_values, $checkout_pane, $order) {
+
+  $settings = $payment_method['settings'];
+  if ($settings['test_mode'] != 'live') {
+    drupal_set_message(t('The PayPoint Professional system is in test mode [!link]. Merchant account is %account', array('!link' => l(t('Change'), 'admin/commerce/config/payment-methods'), '%account' => $settings['merchant'])), 'warning');
+  }
+
+  $form = array();
+
+  // Merge in values from the order.
+  if (!empty($order->data['commerce_paypoint_gateway_hosted'])) {
+    $pane_values += $order->data['commerce_paypoint_gateway_hosted'];
+  }
+
+  // Merge in default values.
+  $pane_values += array(
+    'name' => '',
+  );
+
+  $form['markup'] = array(
+    '#markup' => 'You will be redirected to Paypoint on submission',
+  );
+
+  return $form;
+}
+
+/**
+ * Payment method callback; generation callback for the payment redirect form.
+ *
+ * Returns form elements that should be submitted to the redirected payment
+ * service; because of the array merge that happens upon return, the service’s
+ * URL that should receive the POST variables should be set in the #action
+ * property of the returned form array.
+ */
+function commerce_paypoint_gateway_hosted_redirect_form($form, &$form_state, $order, $payment_method) {
+
+  $settings = $payment_method['settings'];
+
+  if (!isset($settings['merchant'])) {
+    throw new Exception('PayPoint is not setup.');
+  }
+
+  global $base_url;
+  $base_url = preg_match('/rmets.org/', $base_url) ? 'https://www.rmets.org' : $base_url;
+
+  $callback = $base_url . '/checkout/complete/commerce_paypoint_gateway_hosted';
+  watchdog('commerce_paypoint_gateway_hosted', 'Callback URL: !callback', array('!callback' => $callback), WATCHDOG_ERROR);
+
+  $order_total = entity_metadata_wrapper('commerce_order', $order)->commerce_order_total->value();
+  $amount = commerce_currency_amount_to_decimal($order_total['amount'], 'GBP');
+  $currency = commerce_currency_load('GBP');
+  $amount = number_format(commerce_currency_round(abs($amount), $currency), $currency['decimals'], $currency['decimal_separator'], '');
+
+  $form['#action'] = 'https://www.secpay.com/java-bin/ValCard';
+
+  $form['merchant'] = array(
+    '#type' => 'hidden',
+    '#value' => $settings['merchant'],
+  );
+
+  $form['trans_id'] = array(
+    '#type' => 'hidden',
+    '#value' => $order->order_id,
+  );
+
+  $form['callback'] = array(
+    '#type' => 'hidden',
+    '#value' => $callback,
+  );
+
+  if ($settings['test_mode'] != 'live') {
+    $form['test_status'] = array(
+      '#type' => 'hidden',
+      '#value' => $settings['test_mode'],
+    );
+  }
+
+  $form['default_cv2avs'] = array(
+    '#type' => 'hidden',
+    '#value' => 'ALL MATCH',
+  );
+
+  $form['amount'] = array(
+    '#type' => 'hidden',
+    '#value' => $amount,
+  );
+
+  $form['digest'] = array(
+    '#type' => 'hidden',
+    '#value' => _commerce_paypoint_gateway_hosted_create_digest($order->order_id, $amount, $settings['remote']),
+  );
+
+  $form['options'] = array(
+    '#type' => 'hidden',
+    '#value' => 'cb_post=true',
+  );
+
+  $form['md_flds'] = array(
+    '#type' => 'hidden',
+    '#value' => 'trans_id:amount:callback',
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#default_value' => t('Connect to Secure Server'),
+  );
+
+  return $form;
+}
+
+/**
+ * The digest key is used to digitally sign a transaction with paypoint to trust
+ * messages came from us or from them
+ *
+ * @param string $transaction_id
+ *   The unique identifier for the transaction. In the case of noticeboard,
+ *   this is just the notice order_id
+ *
+ * @return string
+ *   A hash created using out secret variables
+ */
+function _commerce_paypoint_gateway_hosted_create_digest($transaction_id, $transaction_amount, $remote) {
+  return md5($transaction_id . $transaction_amount . $remote);
+}
+
+/**
+ * Make the return the digest returned matches what would be expected
+ *
+ * @return string
+ *   The digest hash.
+ */
+function _commerce_create_return_digest($transaction_id, $transaction_amount, $digest_key) {
+  global $base_url;
+  $unencoded = 'trans_id=' . $transaction_id . '&amount=' . $transaction_amount . '&callback=' . $base_url . '/' . COMMERCE_PAYPOINT_CALLBACK;
+  $unencoded .= '&' . $digest_key;
+  return md5($unencoded);
+}
+
+/**
+ * Commerce callback from PayPoint.
+ */
+function commerce_paypoint_gateway_hosted_paypoint_callback() {
+  // We need to grab the digest.
+  $payment_method = commerce_payment_method_instance_load("commerce_paypoint_gateway_hosted|commerce_payment_commerce_paypoint_gateway_hosted");
+  $digest = $payment_method['settings']['digest'];
+
+  // Store all returned data in the details object.
+  $details = new stdClass();
+
+  if ($payment_method['settings']['test_mode'] != 'live' && isset($_GET['test_status']) && $_GET['test_status'] == 'true') {
+
+    drupal_set_message(t('PayPoint is in TEST mode'), 'warning');
+
+    // Allow from the GET on test site only. PayPoint will not deal with
+    // insecure https directly so sends the user too the callback URL
+    // with the data in the GET array.
+    if (!isset($_GET['valid']) || !isset($_GET['trans_id']) || !isset($_GET['code']) || !isset($_GET['hash'])) {
+      // FAIL noisely if GET is used on test site.
+      throw new Exception('Invalid PayPoint response');
+    }
+
+    $valid = check_plain($_GET['valid']);
+    $trans_id = check_plain($_GET['trans_id']);
+
+    $details->order_id = $trans_id;
+    $details->trans_id = $trans_id;
+    $details->returned_amount = isset($_GET['amount']) ? check_plain($_GET['amount']) : '';
+    $details->code = check_plain($_GET['code']);
+    $details->resp_code = isset($_GET['resp_code']) ? check_plain($_GET['resp_code']) : '';
+    $details->message = isset($_GET['message']) ? check_plain($_GET['message']) : '';
+    $details->hash = $_GET['hash'];
+  }
+  else {
+    watchdog('commerce_paypoint_gateway_hosted', 'POST Data: !post, GET Data: !get', array('!post' => nl2br(htmlentities(print_r($_POST, TRUE))), '!get' => nl2br(htmlentities(print_r($_GET, TRUE)))), WATCHDOG_INFO);
+    // If the POST array doesn't contain the valid param, set the data from the GET.
+    // (This was a 'hack' due to Paypoint not sending the data as a POST regardless of sending the correct data to request it as a POST).
+    if (!isset($_POST['valid'])) {
+      $_POST['valid'] = $_GET['valid'];
+      $_POST['trans_id'] = $_GET['trans_id'];
+      $_POST['amount'] = $_GET['amount'];
+      $_POST['valid'] = $_GET['valid'];
+      $_POST['code'] = $_GET['code'];
+      $_POST['resp_code'] = $_GET['resp_code'];
+      $_POST['message'] = $_GET['message'];
+      $_POST['hash'] = $_GET['hash'];
+    }
+
+    $valid = check_plain($_POST['valid']);
+    $trans_id = check_plain($_POST['trans_id']);
+
+    $details->order_id = $trans_id;
+    $details->trans_id = $trans_id;
+    $details->returned_amount = isset($_POST['amount']) ? check_plain($_POST['amount']) : '';
+    $details->code = check_plain($_POST['code']);
+    $details->resp_code = isset($_POST['resp_code']) ? check_plain($_POST['resp_code']) : '';
+    $details->message = isset($_POST['message']) ? check_plain($_POST['message']) : '';
+    $details->hash = $_POST['hash'];
+  }
+
+  $order = commerce_order_load($trans_id);
+  $amount_arr = entity_metadata_wrapper('commerce_order', $order)->commerce_order_total->value();
+  $details->amount = number_format($amount_arr['amount'] / 100, 2, '.', '');
+
+  $expected_hash = _commerce_create_return_digest($trans_id, $details->amount, $digest);
+
+  // Look for problems with the submision (validate submission).
+  if ($details->hash != $expected_hash) {
+    // Invalid hash.
+    watchdog('commerce_paypoint_gateway_hosted', 'SECPAY ERROR: The hash returned from secpay was not valid. Expected: "!expected" and received "!received" for payment for order with order_id !order_id. Details: !details', array('!expected' => $expected_hash, '!received' => $details->hash, '!order_id' => $details->order_id, '!details' => nl2br(htmlentities(print_r($details, TRUE)))), WATCHDOG_ERROR);
+
+    return theme('commerce_paypoint_gateway_hosted_report', array('success' => FALSE, 'title' => 'Authorisation Protocol Error', 'message' => 'ERROR : An Error Occured. Please contact the website provider, quoting error code 1.' . $details->order_id, 'details' => $details));
+  }
+  elseif (!isset($valid) || is_null($valid) || drupal_strlen($valid) == 0) {
+    // Missing the valid paramter.
+    watchdog('commerce_paypoint_gateway_hosted', 'SECPAY ERROR: The valid string was not of an expected type: "!$valid" on payment for node with order_id !order_id', array('!valid' => $valid, '!order_id' => $details->order_id), WATCHDOG_ERROR);
+
+    return theme('commerce_paypoint_gateway_hosted_report', array('success' => FALSE, 'title' => 'Authorisation Protocol Error', 'message' => 'ERROR : An Error Occured. Please contact the website provider, quoting error code 2.' . $details->order_id, 'details' => $details));
+  }
+  elseif (drupal_strlen($trans_id) == 0) {
+    // Missing transaction id.
+    watchdog('commerce_paypoint_gateway_hosted', 'SECPAY ERROR: The transaction id was not of an expected type: "!$trans_id" on payment for node with order_id !order_id', array('!trans_id' => $trans_id, '!order_id' => $details->order_id), WATCHDOG_ERROR);
+
+    return theme('commerce_paypoint_gateway_hosted_report', array('success' => FALSE, 'title' => 'Authorisation Protocol Error', 'message' => 'ERROR : An Error Occured. Please contact the website provider, quoting error code 3.' . $details->order_id, 'details' => $details));
+  }
+
+  // The submission from PayPoint is good. Let's check it's values.
+  $details->status = ($valid == 'true' ? COMMERCE_PAYMENT_STATUS_SUCCESS : COMMERCE_PAYMENT_STATUS_FAILURE);
+
+  // Create a new payment transaction for the order.
+  commerce_paypoint_gateway_hosted_payment($order, $details);
+
+  if ($details->status == COMMERCE_PAYMENT_STATUS_FAILURE) {
+    // Declined transaction.
+    watchdog('commerce_paypoint_gateway_hosted', 'SECPAY PAYMENT FAILED: Payment was declined for !order_id - details: !details', array('!order_id' => $details->order_id, '!details' => nl2br(htmlentities(print_r($details, TRUE)))), WATCHDOG_WARNING);
+    return theme('commerce_paypoint_gateway_hosted_report', array('success' => FALSE, 'title' => 'Authorisation declined', 'message' => 'ERROR : The payment was rejected by your payment provider. [reference: ' . $details->order_id . ']', 'details' => $details));
+  }
+
+  // Transaction successful.
+  commerce_payment_redirect_pane_next_page($order);
+
+  // Not this in the watchdog.
+  watchdog('commerce_paypoint_gateway_hosted', 'SECPAY PAYMENT SUCCESS: Payment was successful for !order_id - details: !details', array('!order_id' => $details->order_id, '!details' => nl2br(htmlentities(print_r($details, TRUE)))), WATCHDOG_NOTICE);
+
+  // We cannot redirect here as it is rendered in a PayPoint
+  // window and PayPoint does not like redirects.
+  // Instead, build the checkout complete page manually.
+  module_load_include('inc', 'commerce_checkout', 'includes/commerce_checkout.checkout_pane');
+  $form_state = array();
+  $message = commerce_checkout_completion_message_pane_checkout_form(NULL, $form_state, NULL, $order);
+
+  // Allow other modules a chance to change the message depending on the order.
+  drupal_alter('commerce_paypoint_gateway_hosted_completion_message', $message, $order);
+
+  // Return the confirmation message.
+  return drupal_render($message);
+}
+
+/**
+ * Implements hook_menu().
+ */
+function commerce_paypoint_gateway_hosted_menu() {
+  $items = array();
+  $items[COMMERCE_PAYPOINT_CALLBACK] = array(
+    'title' => 'Payment confirmation',
+    'description' => 'Confirm successful payment of a notice from PayPoint.',
+    'page callback' => 'commerce_paypoint_gateway_hosted_paypoint_callback',
+    'access arguments' => array('access content'),
+  );
+  return $items;
+}
+
+/**
+ * Implememnts hook_theme().
+ */
+function commerce_paypoint_gateway_hosted_theme() {
+  global $base_url;
+  return array(
+    'commerce_paypoint_gateway_hosted_report' => array(
+      'arguments' => array(
+        'success' => FALSE,
+        'title' => NULL,
+        'message' => NULL,
+        'details' => NULL,
+        'next_url' => $base_url,
+      ),
+      'path' => drupal_get_path('module', 'commerce_paypoint_gateway_hosted') . '/theme',
+      'template' => 'commerce-paypoint-gateway-hosted-report',
+    ),
+  );
+}
+
+/**
+ * Creates an example payment transaction for the specified charge amount.
+ *
+ * @param object $order
+ *   The order the payment applies to.
+ * @param object $details
+ *   The details of the order.
+ */
+function commerce_paypoint_gateway_hosted_payment($order, $details) {
+  $transaction = commerce_payment_transaction_new('commerce_paypoint_gateway_hosted', $order->order_id);
+  $transaction->instance_id = $order->data['payment_method'];
+  $transaction->amount = $order->commerce_order_total[LANGUAGE_NONE][0]['amount'];
+  $transaction->currency_code = $order->commerce_order_total[LANGUAGE_NONE][0]['currency_code'];
+  $transaction->status = $details->status;
+  $transaction->message = $details->message;
+  $transaction->message_variables = array();
+  // $transaction->remote_id = ???
+  commerce_payment_transaction_save($transaction);
+}
+
+/**
+ * Payment method callback: settings form.
+ */
+function commerce_paypoint_gateway_hosted_settings_form($settings = NULL) {
+
+  $form = array();
+
+  // Merge default settings into the stored settings array.
+  $default_currency = variable_get('commerce_default_currency', 'USD');
+
+  $settings = (array) $settings + array(
+    'merchant' => '',
+    'currency_code' => in_array($default_currency, array_keys(commerce_paypoint_gateway_hosted_currencies())) ? $default_currency : 'USD',
+    'test_mode' => 'live',
+    'digest' => '',
+    'remote' => '',
+  );
+
+  $form['merchant'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Paypoint'),
+    '#description' => t('The paypoint merchant in the form abcdef01.'),
+    '#default_value' => $settings['merchant'],
+    '#required' => TRUE,
+  );
+
+  $form['currency_code'] = array(
+    '#type' => 'select',
+    '#title' => t('Currency code'),
+    '#description' => t('Transactions can only be processed in one of the listed currencies.'),
+    '#options' => commerce_paypoint_gateway_hosted_currencies(),
+    '#default_value' => $settings['currency_code'],
+  );
+
+  $form['test_mode'] = array(
+    '#type' => 'radios',
+    '#title' => t('Testing mode'),
+    '#description' => t('Live processes real transaction, true testing mode simulating a successful transaction, false testing mode simulating a failed transaction.'),
+    '#options' => array(
+      'live' => t('Live - use for processing real transactions'),
+      'true' => t('Testing - simulate a successful transaction'),
+      'false' => t('Testing - simulate an unsuccessful transaction'),
+    ),
+    '#default_value' => $settings['test_mode'],
+  );
+
+  $form['digest'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Your digest key as set in your paypoint account.'),
+    '#default_value' => $settings['digest'],
+  );
+
+  $form['remote'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Your remote password as set in your paypoint account, this may be your digest key again depending on your PayPoint setup.'),
+    '#default_value' => $settings['remote'],
+  );
+
+  return $form;
+}
+
+/**
+ * Returns an array of all possible currency codes.
+ */
+function commerce_paypoint_gateway_hosted_currencies() {
+  return drupal_map_assoc(array('AUD', 'BRL', 'CAD', 'CHF', 'CZK', 'DKK', 'EUR', 'GBP', 'HKD', 'HUF', 'ILS', 'JPY', 'MXN', 'MYR', 'NOK', 'NZD', 'PHP', 'PLN', 'SEK', 'SGD', 'THB', 'TWD', 'USD'));
+}
+
+/**
+ * Stop the message on offsite payment.
+ */
+function commerce_paypoint_gateway_hosted_commerce_checkout_page_info_alter(&$checkout_pages) {
+  unset($checkout_pages['payment']['help']);
+}

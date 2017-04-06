@@ -1,0 +1,293 @@
+<?php
+/**
+ * @file
+ * Code for the RMetS Membership User feature.
+ */
+
+include_once 'rmets_membership_user.features.inc';
+/**
+ * @file
+ */
+
+use \Drupal\rmets_membership_user\EntityWrapper\User\UserWrapper;
+
+/**
+ * Implements hook_menu().
+ */
+function rmets_membership_user_menu() {
+  $items = array();
+
+  $items['user/%user/mydetails'] = array(
+    'title' => 'My Details',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('rmets_membership_user_mydetails_form', 1),
+    'access callback' => 'user_edit_access',
+    'access arguments' => array(1),
+    'type' => MENU_LOCAL_TASK,
+    'file' => 'rmets_membership_user.pages.inc',
+    'weight' => 1,
+  );
+
+  $items['user/%user/mydetails/details'] = array(
+    'title' => 'My Details',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('rmets_membership_user_mydetails_form', 1),
+    'access callback' => 'user_edit_access',
+    'access arguments' => array(1),
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'file' => 'rmets_membership_user.pages.inc',
+    'weight' => 1,
+  );
+
+  $items['user/%user/mydetails/workexperience'] = array(
+    'title' => 'Work Experience',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('rmets_membership_user_user_profile_form', 1),
+    'access callback' => 'user_edit_access',
+    'access arguments' => array(1),
+    'type' => MENU_LOCAL_TASK,
+    'file path' => drupal_get_path('module', 'user'),
+    'file' => 'user.pages.inc',
+    'weight' => 2,
+  );
+
+  $items['user/%user/mydetails/education'] = array(
+    'title' => 'Education and Qualifications',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('rmets_membership_user_education_user_profile_form', 1),
+    'access callback' => 'user_edit_access',
+    'access arguments' => array(1),
+    'type' => MENU_LOCAL_TASK,
+    'file path' => drupal_get_path('module', 'user'),
+    'file' => 'user.pages.inc',
+    'weight' => 3,
+  );
+
+  $items['user/%user/donations'] = array(
+    'title' => 'Donations',
+    'page callback' => 'rmets_membership_user_donations',
+    'page arguments' => array(1),
+    'access callback' => 'user_edit_access',
+    'access arguments' => array(1),
+    'type' => MENU_LOCAL_TASK,
+    'file' => 'rmets_membership_user.pages.inc',
+    'weight' => 2,
+  );
+
+  return $items;
+}
+
+/**
+ * Implements hook_forms().
+ */
+function rmets_membership_user_forms() {
+  $forms['rmets_membership_user_user_profile_form'] = array(
+      'callback' => 'user_profile_form',
+  );
+  $forms['rmets_membership_user_education_user_profile_form'] = array(
+    'callback' => 'user_profile_form',
+  );
+  return $forms;
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function rmets_membership_user_form_rmets_membership_user_user_profile_form_alter(&$form, &$form_state, $form_id) {
+  $unset_array = rmets_membership_user_get_unset_fields();
+  foreach ($form['#groups']['group_experience']->children AS $child) {
+    $unset_array[] = $child;
+  }
+
+  foreach ($unset_array AS $unset) {
+    $form[$unset]['#access'] = FALSE;
+  }
+
+  // Show the fields for this page.
+  $set_array = array(
+    'field_qualifying_work_experience',
+  );
+
+  foreach ($set_array AS $unset) {
+    $form[$unset]['#access'] = TRUE;
+  }
+
+  $form['field_qualifying_work_experience']['#prefix'] = '
+    <p>Please enter your Work Experience below. You can use the ‘Add another item’ button at the bottom of the page to add in all your relevant positions, whether in one organisation or with different employers.</p>
+    <p>If you apply for Registered or Chartered Meteorologist, this information will be automatically pulled through to your online application form.</p>
+    <p>Please state the start and end dates from which your qualifying work experience should count and the duration of the work experience. Time spent on training courses does not count towards qualifying experience. Time spent as an operational supernumerary (trainee) or under close direct supervision counts as 50% of elapsed time.</p>
+    <p>If you are returning to the full Register from a period as a “dormant” registrant, you need to show 1 full year of “Qualifying work experience”.</p>';
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function rmets_membership_user_form_rmets_membership_user_education_user_profile_form_alter(&$form, &$form_state, $form_id) {
+  $unset_array = rmets_membership_user_get_unset_fields();
+  foreach ($unset_array AS $unset) {
+    $form[$unset]['#access'] = FALSE;
+  }
+
+  // Show the fields for this page.
+  $set_array = array(
+    'field_qualifications',
+    'field_file_attachment',
+  );
+
+  foreach ($set_array AS $unset) {
+    $form[$unset]['#access'] = TRUE;
+  }
+
+  $form['#validate'][] = 'rmets_membership_user_specialisms_validate';
+}
+
+/**
+ * Validation callback for specialisms.
+ */
+function rmets_membership_user_specialisms_validate($form, &$form_state) {
+  if ($form_state['values']['field_areas_of_specialism']) {
+    $areas_of_specialism = count($form_state['values']['field_areas_of_specialism'][LANGUAGE_NONE]);
+    if ($areas_of_specialism > 3) {
+      form_set_error('field_areas_of_specialism', 'You can select a maximum of three specialisms');
+    }
+  }
+}
+
+function rmets_membership_user_get_unset_fields() {
+  return [
+    'field_memberhsip_number',
+    'field_surname',
+    'field_forenames',
+    'field_dateofbirth',
+    'field_mobiletelephone',
+    'field_title',
+    'field_committee_membership',
+    'field_last_cpd_reminder_date',
+    'field_next_cpd_submission_date',
+    'field_cpd_report_submission_date',
+    'field_last_cpd_rep_remind_date',
+    'field_crm_contact_id',
+    'field_accreditation_types',
+    'account',
+    'picture',
+    'signature_settings',
+    'ckeditor',
+    'masquerade',
+    'redirect',
+    'timezone',
+  ];
+}
+
+
+/**
+ * Implements hook_menu_alter().
+ */
+function rmets_membership_user_menu_alter(&$items) {
+  $items['user/%user/edit']['title'] = 'Change Password';
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function rmets_membership_user_form_user_profile_form_alter(&$form, &$form_state, $form_id) {
+  // Hide the user fields on the form, they are available on the mydetails tab.
+  $unset_array = array(
+    'field_membership_number',
+    'field_crm_contact_id',
+    'field_title',
+    'field_forenames',
+    'field_surname',
+    'field_dateofbirth',
+    'field_mobiletelephone',
+    'field_qualifying_work_experience',
+    'field_qualifications',
+    'field_file_attachment',
+  );
+  foreach ($unset_array AS $unset) {
+    $form[$unset]['#access'] = FALSE;
+  }
+  $form['account']['mail']['#access'] = FALSE;
+}
+
+function rmets_membership_user_module_implements_alter(&$implementations, $hook) {
+  if ($hook == 'form_alter') {
+    // Move my_module_rdf_mapping() to the end of the list. module_implements()
+    // iterates through $implementations with a foreach loop which PHP iterates
+    // in the order that the items were added, so to move an item to the end of
+    // the array, we remove it and then add it.
+    if (isset($implementations['rmets_membership_user'])) {
+      $group = $implementations['rmets_membership_user'];
+      unset($implementations['rmets_membership_user']);
+      $implementations['rmets_membership_user'] = $group;
+    }
+  }
+}
+
+/**
+ * Helper function to get the user wrapper object having been updated from CRM.
+ *
+ * @param $account
+ *
+ * @return \Drupal\rmets_membership_user\EntityWrapper\User\UserWrapper
+ */
+function rmets_membership_user_get_user_wrapper($account) {
+  $wrapper = &drupal_static(__FUNCTION__);
+  if (!isset($wrapper)) {
+    $wrapper = new UserWrapper($account);
+    $wrapper->updateFromCrm();
+  }
+  return $wrapper;
+}
+
+/**
+ * Implements hook_user_login().
+ */
+function rmets_membership_user_user_login(&$edit, $account) {
+  $user_wrapper = rmets_membership_user_get_user_wrapper($account);
+  // Check if a valid CRM contact was found.
+  if ($user_wrapper->isValidCrmContact()) {
+    // Update the Drupal record with details from CRM.
+    $user_wrapper->save(FALSE);
+  }
+  else {
+    // No record found in CRM for this contact so create the contact in CRM.
+    $user_wrapper->setGiftAid(TRUE);
+    $user_wrapper->setMarketingMaterials(TRUE);
+    $user_wrapper->save();
+    return;
+  }
+
+  // Check to see if users subscription is unpaid.
+  $unpaid_subscription = $user_wrapper->hasUnpaidSubscriptionPayments();
+  if ($unpaid_subscription) {
+    $payment_deadline = $user_wrapper->getSubscriptionPaymentDeadline();
+    if ($user_wrapper->hasMemberRole() && REQUEST_TIME > $payment_deadline) {
+      $user_wrapper->removeMemberRole();
+      $user_wrapper->save(FALSE);
+
+      drupal_set_message(t('You have an unpaid subscription so your membership has been revoked. Please visit your "My Subscriptions" within "My Account" to pay your unpaid subscription.'), 'warning');
+    }
+  }
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function rmets_membership_user_form_user_login_alter(&$form, &$form_state, $form_id) {
+  $form['#validate'][] = 'rmets_membership_user_form_login_validate';
+}
+
+/**
+ * Callback function to validate on login.
+ */
+function rmets_membership_user_form_login_validate($form, &$form_state) {
+  $account = user_load_by_name($form_state['values']['name']);
+  if (!empty($account)) {
+    $user_wrapper = rmets_membership_user_get_user_wrapper($account);
+    // Check if multiple contacts returned.
+    if ($user_wrapper->hasMultipleMatchingContacts()) {
+      form_set_error('mail', t('Unfortunately we have been unable to find a matching member record with your email address. Please contact the membership department for further instructions.'));
+      return;
+    }
+  }
+}

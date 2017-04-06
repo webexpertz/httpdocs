@@ -1,0 +1,7 @@
+{
+    "name": "root/rmets_crm",
+    "description": "",
+    "require": {
+        "guzzlehttp/guzzle": "~5.0"
+    }
+}

@@ -1,0 +1,12 @@
+<?php
+/**
+ * @file
+ * Install file for RMetS CPD.
+ */
+
+/**
+ * Feature update to add in new user fields.
+ */
+function rmets_cpd_update_7105() {
+  features_revert(array('rmets_cpd' => array('rmets_cpd_features')));
+}

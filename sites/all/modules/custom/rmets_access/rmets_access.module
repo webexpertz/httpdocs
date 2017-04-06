@@ -1,0 +1,300 @@
+<?php
+
+/**
+ * @file
+ * This module looks after member registration and
+ * member detail synchronisation between the rmets
+ * site and enterprise, their memebrship database
+ */
+
+define('ACCESS_PUBLIC', 0);
+define('ACCESS_MEMBERS', 1);
+
+define('ACCESS_MEMBER_ROLE', 'member');
+define('ACCESS_CONTENT_ADMINISTRATOR_ROLE', 'content administrator');
+
+use Drupal\rmets_membership_user\EntityWrapper\User\UserWrapper;
+use Drupal\rmets_crm\Api\ApiServerException;
+
+/**
+ * Implements hook_permission().
+ */
+function rmets_access_permission() {
+  $items = array();
+
+  $items['can set the access level on nodes'] = array(
+    'title' => t('Can set access level on nodes'),
+    'description' => t('The user is able see and use the access level control on node edit forms. Without this permission all nodes created by this user default to public access.'),
+  );
+
+  $items['access member content'] = array(
+    'title' => t('Can access member only content'),
+    'desctiption' => t('Members access permission'),
+  );
+
+  return $items;
+}
+
+/**
+ * DRUPAL FORM
+ * The RMetS member first time registration form.
+ */
+function rmets_access_member_register(&$form, &$form_state) {
+  drupal_set_title(t('Member website registration'));
+
+  $breadcrumb = drupal_get_breadcrumb();
+  $breadcrumb[] = t('Member website registration');
+  drupal_set_breadcrumb($breadcrumb);
+
+  $form = user_register_form($form, $form_state);
+
+  $form['terms_and_conditions'] = _rmets_access_terms_and_conditions_checkbox();
+
+  $form['account']['name']['#size'] = 10;
+
+  // Hide the email address.
+  $form['account']['mail'] = array(
+    '#type' => 'value',
+    // This is replaced by the email address on the enterprise records later but
+    // something has to be here incase validation fails and then the user
+    // module will complain of no email.
+    '#value' => md5(rand(0, 10000)) . '@example.com',
+  );
+
+  // Hide the first name field.
+  $form['field_first_name']['#access'] = FALSE;
+
+  $form['account']['name']['#description'] = t('Your Royal Meteorological Society membership number.');
+  $form['account']['name']['#title'] = t('Membership number');
+
+  // Add our validation function as the first validation function.
+  // This runs first when the form is submitted and sets everything up
+  // so that the drupal user_register_form can do its work.
+  array_unshift($form['#validate'], 'rmets_access_member_register_validate');
+
+  $form['openinginfo'] = array(
+    '#markup' => '<p>' . t('This is a first time registration form for Royal Meteorological Society members who have not yet received their website login details.') . '</p>',
+    '#weight' => -50,
+  );
+
+  $form['account']['dateofbirth'] = array(
+    '#type' => 'date',
+    '#title' => t('Date of birth'),
+    '#description' => 'Please enter your date of birth. It is used to validate your registration.',
+    '#required' => TRUE,
+  );
+
+  $form['actions']['submit']['#value'] = 'Register';
+
+  // This is the  member signup form - make people members by default.
+  $form['account']['roles']['#default_value'] = array(user_role_load_by_name(ACCESS_MEMBER_ROLE)->rid);
+
+  return $form;
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function rmets_access_form_user_register_form_alter(&$form, &$form_state, $form_id) {
+  if (!user_is_logged_in()) {
+    ctools_add_js('rmets_access', 'rmets_access');
+
+    $form['new_user_message'] = array(
+      '#markup' => t('If you are an existing member of the society and are creating your first online account please contact 0118 956 8500'),
+      '#prefix' => '<div class="messages warning">',
+      '#suffix' => '</div>',
+      '#weight' => -102,
+    );
+
+    $form['new_member_join_message'] = array(
+      '#markup' => t('If you wish to sign up for new membership, then please visit our membership !joining_link page.', array('!joining_link' => l('joining', 'membership/join'))),
+      '#prefix' => '<p>',
+      '#suffix' => '</p>',
+      '#weight' => -101,
+    );
+
+    $form['membership_level'] = array(
+      '#type' => 'radios',
+      '#title' => t('Choose an account creation option from the list below'),
+      '#options' => array(
+        1 => t('I am an existing individual member with a membership number and would like to activate my online account.'),
+        2 => t('I am an existing corporate member with a membership number and would like to activate my online account.'),
+        3 => t('I am not currently a member of the society and would like to create a non-member website account. I understand that I can upgrade this account later if I purchase membership to the society.'),
+      ),
+      '#default_value' => 1,
+      '#weight' => -100,
+     );
+
+  }
+
+  $form['field_membership_number'][LANGUAGE_NONE]['#suffix'] = '<div class="description">' . t('If you have a Royal Meteorological Society membership number enter it here to link your website account to it.') . '</div></div>';
+
+  // Add our validation function as the first validation function.
+  // This runs first when the form is submitted and sets everything up
+  // so that the drupal user_register_form can do its work.
+  array_unshift($form['#validate'], 'rmets_access_member_register_validate');
+
+  if (!user_is_logged_in()) {
+    $form['terms_and_conditions'] = _rmets_access_terms_and_conditions_checkbox();
+
+    $form['submission_message'] = array(
+      '#markup' => '<p class="padded">' . t('When you click the "Create new account" button you will be sent an email to confirm you own your email address. There will be a link inside the email where you will be asked to go to to set a password for your new account.') . '</p>',
+      '#weight' => 11,
+    );
+  }
+}
+
+/**
+ * Validate the membership registration form
+ */
+function rmets_access_member_register_validate(&$form, &$form_state) {
+  if (!user_is_logged_in() && $form_state['values']['terms_and_conditions'] !== 1) {
+    form_set_error('terms_and_conditions', t('You must accept the terms and conditions and privacy policy of the site in order to register.'));
+    return;
+  }
+
+  if (stripos($form_state['values']['name'], 'admin') === 0) {
+    form_set_error('name', 'The username you have chosen is not allowed. Please choose a different one.');
+    return;
+  }
+
+  // This is a non-member account, no further validation required.
+  if ($form_state['values']['membership_level'] == 3) {
+    // Blank the membership number field for a non-member account.
+    $form_state['values']['field_membership_number'][LANGUAGE_NONE][0]['value'] = '';
+    return;
+  }
+
+  $membership_number = &$form_state['values']['field_membership_number'][LANGUAGE_NONE][0]['value'];
+
+  // If they have not set a membership number, set a form error.
+  if (empty($membership_number)) {
+    form_set_error('field_membership_number][und][0', t('You must supply your membership number to be able to activate your online account'));
+  }
+
+  try {
+    rmets_crm_get_api();
+  }
+  catch (ApiServerException $e) {
+    watchdog('rmets_access', 'User with membership number %membership_number could not register as enterprise is not responding', array('%membership_number' => $membership_number), WATCHDOG_WARNING);
+    form_set_error('name', 'We cannot communicate with our membership database at the moment. Please try again later');
+    return;
+  }
+
+  // Check if the membership number is in use on another account.
+  $user = rmets_crm_user_load_by_membership_number($membership_number);
+
+  if (!empty($user)) {
+    form_set_error('field_membership_number', t('The membership number you have entered is already in use.'));
+    return;
+  }
+
+  try {
+    // Get the member from CRM by email.
+    $email = strtolower($form_state['values']['mail']);
+    $account = entity_create('user', array('mail' => $email));
+    $user_wrapper = new UserWrapper($account);
+    $user_wrapper->updateFromCrm();
+
+    if (!$user_wrapper->isValidCrmContact()) {
+      form_set_error('mail', 'The EMail address you have entered does not match the one stored on your Society member profile. Please check and try again or contact the membership department.');
+      return;
+    }
+
+    if ($membership_number != $user_wrapper->getMembershipNumber()) {
+      form_set_error('field_membership_number', t('We cannot find any details for membership number %membership_number. Please check and try again.', array('%membership_number' => $membership_number)));
+      return;
+    }
+
+    if (!$user_wrapper->getDateOfBirth()) {
+      // There isn't a date of birth set on Enterprise.
+      form_set_error('name', t('We cannot find your date of birth on your membership record. The date of birth is required to be able to validate who you are on first time registration. Please contact the membership department for further instructions.'));
+      return;
+    }
+
+    $dob = strtotime($form_state['values']['field_dateofbirth'][LANGUAGE_NONE][0]['value']);
+
+    if (!$dob) {
+      form_set_error('field_dateofbirth', 'The date of birth must be supplied if you would like to link the account to your online account for the purposes of checking you are the owner of the account.');
+    }
+
+    // Check date of birth.
+    if (date('Y-m-d', $dob) !== date('Y-m-d', $user_wrapper->getDateOfBirth())) {
+      form_set_error('dateofbirth', 'We could not validate your details. Please check your membership number, surname and date of birth and try again');
+      watchdog('rmets_access', 'Forbid registration for member with number %number as dob given (%given) is not the same as on the member record (%expected)', array('%number' => $membership_number, '%given' => $dob . ' (' . $form_state['values']['field_dateofbirth'][LANGUAGE_NONE][0]['value'] . ')', '%expected' => $user_wrapper->getDateOfBirth()), WATCHDOG_WARNING);
+      return;
+    }
+
+    // Check surname.
+    if (strtolower($user_wrapper->getSurname()) !== strtolower($form_state['values']['field_surname'][LANGUAGE_NONE][0]['value'])) {
+      form_set_error('field_surname', 'We could not validate your details. Please check your membership number, surname and date of birth and try again');
+      watchdog('rmets_access', 'Forbid registration for member with number %number as surname given (%given) is not the same as on the member record (%expected)', array('%number' => $membership_number, '%given' => $form_state['values']['field_surname'][LANGUAGE_NONE][0]['value'], '%expected' => $user_wrapper->getSurname()), WATCHDOG_WARNING);
+      return;
+    }
+
+    // Set their firstname.
+    $form_state['values']['field_forenames'][LANGUAGE_NONE][0]['value'] = $user_wrapper->getForename();
+
+    // TODO: Check for an active membership.
+    // This is the  member signup form - make people members by default.
+    $rid = user_role_load_by_name(ACCESS_MEMBER_ROLE)->rid;
+    $form_state['values']['roles'] = array($rid => $rid);
+  }
+  catch (Exception $e) {
+    watchdog('rmets_access', 'Unexpected register error: %message', array('%message' => $e->getMessage()), WATCHDOG_ERROR);
+    form_set_error('name', 'We cannot communicate with our membership database at the moment. Please try again later');
+  }
+}
+
+/**
+ * Private functions.
+ */
+
+/**
+ * Helper function to generate the form_api code for a terms and conditions
+ * checkbox. This checkbox appears on two forms so code is here so it can
+ * be edited in one place.
+ *
+ * @see sor_access_user_form()
+ * @see sor_access_form_alter()
+ */
+function _rmets_access_terms_and_conditions_checkbox() {
+  return array(
+    '#type' => 'checkbox',
+    '#title' => t('Terms and conditions'),
+    '#description' => t('Tick this box if you agree to the ' . l('terms and conditions', 'terms-and-conditions') . ' and ' . l('privacy policy', 'legal-privacy-and-payments') . ' of the site.'),
+    '#title' => t('I agree to the Terms and conditions and privacy policy.'),
+    '#weight' => 10,
+  );
+}
+
+/**
+ * Implemntation of hook_node_access().
+ */
+function rmets_access_node_access($node, $op, $account) {
+
+  if (is_object($node) && isset($node->field_rmets_access)) {
+
+    if ($op != 'view') {
+      return NODE_ACCESS_IGNORE;
+    }
+
+    if ($node->status == 0) {
+      return NODE_ACCESS_IGNORE;
+    }
+
+    $node_wrapper = entity_metadata_wrapper('node', $node);
+
+    if ($node_wrapper->field_rmets_access->value() == ACCESS_PUBLIC) {
+      return NODE_ACCESS_IGNORE;
+    }
+
+    if ($node_wrapper->field_rmets_access->value() == ACCESS_MEMBERS && user_access('access member content')) {
+      return NODE_ACCESS_ALLOW;
+    }
+
+    return NODE_ACCESS_DENY;
+  }
+
+  return NODE_ACCESS_IGNORE;
+}

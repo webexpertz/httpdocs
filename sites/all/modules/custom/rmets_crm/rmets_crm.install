@@ -1,0 +1,10 @@
+<?php
+/**
+ * @file
+ * Install hooks for rmets_crm.
+ */
+
+function rmets_crm_schema() {
+  $schema['cache_crm'] = drupal_get_schema_unprocessed('system', 'cache');
+  return $schema;
+}

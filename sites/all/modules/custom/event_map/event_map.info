@@ -1,0 +1,4 @@
+name = "RMetS Events"
+core = 7.x
+package = RMetS
+php = 5.2.4

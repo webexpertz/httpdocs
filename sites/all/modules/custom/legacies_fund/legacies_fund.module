@@ -1,0 +1,22 @@
+<?php
+/**
+ * @file
+ * Code for the legacies_fund feature.
+ */
+
+include_once 'legacies_fund.features.inc';
+
+/**
+ * Implements hook_menu_block_tree_alter().
+ * When the menu block is created, rebuild the menu depending on
+ * the current contexts.
+ */
+function legacies_fund_menu_block_tree_alter(&$tree, $config) {
+  if (context_isset('context', 'legacies_fund')) {
+    // We want the left hand menu to appear leacy fund pages.
+    $q = $_GET['q'];
+    menu_set_active_item(drupal_get_normal_path('our-activities/grants-and-bursaries/legacies-fund'));
+    $tree = menu_tree_page_data('main-menu');
+    $_GET['q'] = $q;
+  }
+}

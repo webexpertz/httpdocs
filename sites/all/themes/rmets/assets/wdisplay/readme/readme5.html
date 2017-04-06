@@ -1,0 +1,77 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+	<head>
+		<title>Weather Display Live</title>
+		<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+	    <link href="readme.css" rel="stylesheet" type="text/css" />
+	</head>
+	<body id="tab6">
+		<h1>Weather Display Live - Getting Started
+		</h1>
+		<ul id="tabnav">
+			<li class="tab1"><a href="readme.html">Overview</a></li>
+			<li class="tab2"><a href="readme1.html">Installation</a></li>
+			<li class="tab3"><a href="readme2.html">Upgrading</a></li>
+			<li class="tab4"><a href="readme3.html">Configuring</a></li>
+			<li class="tab5"><a href="readme4.html">Purchasing</a></li>
+			<li class="tab6"><a href="readme5.html">Troubleshooting</a></li>
+			<li class="tab7"><a href="readme6.html">Releases</a></li>
+		</ul>
+
+		<h3>Troubleshooting</h3>
+		<p>If Weather Display Live fails to load correctly in your web browser please
+		carefully check the following -</p>
+		<p><strong>Errors loading data or blank screens </strong></p>
+		<ul>
+			<li>
+				Weather Display Live requires Flash player 8 to work correctly. You can
+				download this version from the Adobe website at <a href="http://www.macromedia.com/go/getflashplayer" target="_blank">
+					http://www.adobe.com/go/getflashplayer</a>
+			<li>
+				You have changed the<strong> </strong>line in the index.html file to reflect the location of your wdlconfig.xml
+			file.
+			<li>
+				You have put the wdlv6_03.swf file and the index.html file in the same folder
+				as the wdlconfig.xml and clientraw.txt file on your web server, or you've
+				specified the location of the clientraw files in the wdlconfig.xml file.</li>
+	    </ul>
+		<p><strong>A mesage saying you need to upgrade or install Flash v8 </strong></p>
+		<ul>
+		  <li>Ensure you've uploaded the swfobject.js file to the WDL location on your website.</li>
+          <li>Check you have javascript enabled and flash installed in your web browser. </li>
+    </ul>
+		<p><strong>Error loading configuration </strong></p>
+		<ul>
+		  <li>9 times out of 10 this is because you've specified a different domain for your wdlconfig.xml file. For example you're viewing WDL in your browser at http://www.mywebsite.com but the location in your html file for the wdlconfig.xml file is http://mywebsite.com. Flash treats this as a different domain and will not load data for security reasons. To rectify this change the html line to http://www.mywebsite.com </li>
+    </ul>
+		<p><strong>No changes are showing in your web browser </strong></p>
+		<p>If you have made changes to the wdlconfig.xml file and they are not showing up
+			in your web browser this is usually because the file is being cached somewhere,
+			either by your web browser or a proxy server somewhere in the chain. This is
+			commonly hosted by your Internet Service Provider to reduce internet traffic.
+			There are four things you can try if your browser is caching -</p>
+		<ol>
+			<li>
+			Refresh the page. In Internet Explorer press F5.
+			<li>
+			Force a refresh of the cache in your browser. In Internet Explorer press Ctrl +
+			F5
+			<li>
+			Restart your browser.
+			<li>
+				Empty your browsers cache completely. In Internet Explorer go to Tools -
+				Internet Options - General and click on 'Delete Files'.</li>
+		</ol>
+		<p>Flash will not load data files which reside in a different domain to the actual
+			swf file for security reasons. Therefore make sure your swf, wdlconfig.xml and
+			clientraw.txt files all reside in the same domain.		</p>
+		<p>For all features to work correctly you must be using Weather Display v10.37i or
+			greater.		</p>
+		<p>For any other issues please post to the Weather Display forum at <a href="http://www.weather-watch.com/smf/" target="_blank">
+				http://www.weather-watch.com/smf/</a> where I'll do my best to help.		</p>
+		<p><a href="readme6.html" class="style5">Release History &gt;&gt; </a>		</p>
+		<p>&nbsp;</p>
+		<p>&nbsp;</p>
+		<p align="center" class="small">© Julian Best 2008</p>
+	</body>
+</html>

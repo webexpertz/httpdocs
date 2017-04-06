@@ -1,0 +1,66 @@
+User Licence Agreement
+======================
+
+You should read the following terms and conditions before using this software.
+
+YOUR INSTALLATION AND/OR USE OF THIS SOFTWARE INDICATES YOUR ACCEPTANCE OF THIS LICENCE AGREEMENT AND WARRANTY.
+
+You may not alter this software in any way.  
+
+You may not decompile, reverse engineer, disassemble or otherwise reduce this software to a human perceivable form.  You may not modify or rent for profit this software, or create derivative works based upon this software.
+
+You may not publicise or distribute any algorithms or information used by this software without permission of the author/s.
+
+You hereby agree to indemnify, hold harmless, and defend the author(s) from and against any and all liabilities, damages, losses, costs and expenses (including reasonable legal fees) arising from or related to any claim, action, proceeding or allegation that arises or results, either directly or indirectly, from the use and distribution of this software. 
+
+
+Copyright Notice
+----------------
+"Weather Display Live" is the sole Copyright of Julian Best, ©2006 all rights reserved.
+
+"Weather Display" is the sole Copyright of Brian Hamilton ©2004 all rights reserved.
+
+Flash is a registered trademark of Adobe Systems Incorporated. all rights reserved.
+All other trademarks are copyright of their respective owner/s.
+
+Parts of this software Copyright ©2004-2006 Enterprise Distributed Technologies Ltd. All Rights Reserved.
+
+
+Warranty Disclaimer
+-------------------
+THE SOFTWARE IS PROVIDED AS IS WITHOUT WARRANTY OF ANY KIND.TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE AUTHOR/S FURTHER DISCLAIM ALL WARRANTIES, INCLUDING WITH OUT LIMITATION ANY IMPLIED WARRANTIES OF MERCHANT ABILITY, FITNESS FOR A PARTICULAR PURPOSE, ACCURACY OF INFORMATION AND NON INFRINGEMENT. THE ENTIRE RISK ARISING OUT OF THE USE OR PERFORMANCE OF THIS SOFTWARE AND DOCUMENTATION REMAINS WITH THE RECIPIENT. TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL THE AUTHOR/S BE LIABLE FOR ANY CONSEQUENTIAL, INCIDENTAL, DIRECT, INDIRECT, SPECIAL, PUNITIVE OR OTHER DAMAGES OR COSTS WHATSOEVER (INCLUDING, WITH OUT LIMITATION, DAMAGES OR COSTS FOR LOSS OF BUSINESS PROFITS, BUSINESS INTERRUPTION, LOSS OF BUSINESS INFORMATION OR OTHER PECUNIARY LOSS) ARISING OUT OF THIS AGREEMENT OR THE USE OF OR INABILITY TO USE THE SOFTWARE, EVEN IF THE AUTHOR/S OF THE SOFTWARE HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES. THE AUTHOR/S DO NOT TAKE ANY RESPONSIBILITY AGAINST ANY DAMAGE THIS SOFTWARE MAY DO TO YOUR SYSTEM OR ANOTHER.
+
+THE SOFTWARE IS NOT WARRANTED TO BE FAULT-TOLERANT, AND IS NOT INTENDED FOR THE DESIGN, CONSTRUCTION, MAINTENANCE, OPERATION, CONTROL, OR ANY OTHER USE IN CONNECTION WITH HIGH RISK SYSTEMS. WE SPECIFICALLY DISCLAIM ANY EXPRESS OR IMPLIED WARRANTY OF FITNESS FOR PURPOSE IN CONNECTION WITH HIGH RISK SYSTEMS.
+‘High Risk Systems’ means systems in environments requiring fail-safe performance (such as nuclear facilities, aircraft navigation or communication systems, air traffic control, direct life support machines, storm chasing or weapons systems), in which the failure of the software could lead directly to death, personal injury, or severe physical or environmental damage. You agree that you will not use the software for any purpose in connection with High Risk Systems.
+
+ALTHOUGH the author/s DO NOT WARRANT THAT THE SOFTWARE SUPPLIED HEREUNDER SHALL BE FREE FROM ALL KNOWN VIRUSES WE HAVE USED COMMERCIALLY REASONABLE EFFORTS TO CHECK FOR THE MOST COMMONLY KNOWN VIRUSES. YOU ARE NEVERTHELESS SOLELY RESPONSIBLE FOR VIRUS SCANNING THE SOFTWARE.
+
+
+Warranty Disclaimer for 3rd Party components
+--------------------------------------------
+THIS SOFTWARE IS PROVIDED `AS IS' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL ANY PERSON WHO HAS CONTRIBUTED TO OR IS THE OWNER OF ANY PART OF THIS SOFTWARE BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+Evaluation and Registration
+---------------------------
+The following version of "Weather Display Live" is a Shareware copy. Subject to the terms in this document, you are hereby licenced to use this software for evaluation purposes without charge.
+
+Provided that you verify that you are distributing the original file,you are hereby licenced to make as many copies as you wish, give EXACT copies of the original version to anyone and distribute the software and documentation in its unmodified form via electronic means. 
+
+You are specifically prohibited from distributing the software and/or documentation with other products (commercial or otherwise) with out prior written permission from the author/s.
+
+
+Acknowledgements
+----------------
+You acknowledge that you have had the opportunity to evaluate the Software without charge, and that you have satisfied yourself that it meets your requirements in all material respects.It is not technically practicable to guarantee software to be error-free, and you agree that if any such errors are found to exist they shall not constitute a breach of this Licence.
+
+You acknowledge that these terms supersede all prior agreements, and are complete and exclusive. No oral or written information given by the author/s or on our behalf shall create a warranty or collateral contract, or in any way increase the scope of this warranty in any way, and you may not rely on any such advice.
+
+This Licence shall be governed by the laws of England.
+
+
+Contact
+-------
+Email: julian@weather-display.com
+Web Site: http://www.weather-display.com/
+
